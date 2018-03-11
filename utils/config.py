@@ -8,13 +8,19 @@ cfg = edict()
 
 cfg.name = ''
 
+# Parameters for network architecture
 cfg.NETWORK = edict()
 cfg.NETWORK.PIXEL_MEANS = (0.485, 0.456, 0.406)
 cfg.NETWORK.PIXEL_STDS = (0.229, 0.224, 0.225)
+
 cfg.DATASET = edict()
 cfg.DATASET.NAME = ''
 cfg.DATASET.CACHE_FOLDER = 'cache'
 cfg.DATASET.IMG_CHANNELS = 3
+cfg.DATASET.TRAIN_SETS = ['train']
+cfg.DATASET.TEST_SET = 'test'
+cfg.DATASET.BASE_PATH = None
+cfg.DATASET.AUGMENT_TRAIN = True
 
 cfg.TRAIN = edict()
 
@@ -50,9 +56,10 @@ def update_config(config_path: Path):
                     if name == 'TRAIN.RESIZE_SCALES' or \
                             name == 'NETWORK.PIXEL_MEANS' or \
                             name == 'NETWORK.PIXEL_STDS':
-                        default_dict[key] = tuple(value)
-                    else:
-                        default_dict[key] = value
+                        value = tuple(value)
+                    elif name == 'DATASET.BASE_PATH':
+                        value = Path(value)
+                    default_dict[key] = value
             else:
                 raise KeyError(f"key ({key}) must exist in config.py")
 

@@ -1,6 +1,7 @@
 name: "pascal_voc"
 DATASET:
   NAME: PASCAL_VOC
+  BASE_PATH: "data/VOCdevkit"
 
 TRAIN:
   RESIZE_SCALES:

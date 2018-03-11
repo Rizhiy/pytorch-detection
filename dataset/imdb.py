@@ -20,7 +20,7 @@ class IMDB(Dataset):
         :param base_path: path to the root directory of the dataset
         :param augment: whether to augment the data
         """
-        super()
+        super().__init__()
         self.name = name
         self.img_set = img_set
         self.augment = augment
