@@ -1,1 +1,4 @@
 numpy==1.14.1
+easydict==1.7
+scipy==1.0.0
+pyyaml==3.12
