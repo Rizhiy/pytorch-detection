@@ -50,7 +50,6 @@ class IMDB(Dataset):
         shape = data['shape']
         crop_scale = np.random.uniform(low=cfg.TRAIN.CROP_MIN_SCALE)
         resize_scale = np.random.uniform(*cfg.TRAIN.RESIZE_SCALES)
-        print(resize_scale)
         # First crop the image a bit
         w, h = shape
         tw, th = tuple((shape * crop_scale).astype(int))

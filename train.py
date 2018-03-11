@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 
 from dataset import PASCAL_VOC
 from dataset.collate import resize_collate
-from utils.config import cfg, update_config
+from utils.config import update_config
 
 parser = argparse.ArgumentParser(description="Train a network",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -14,7 +14,6 @@ parser.add_argument('cfg', help="Path to the config to use", type=Path, metavar=
 args = parser.parse_args()
 
 update_config(args.cfg)
-print(cfg)
 train_imdb = PASCAL_VOC('train', Path('data/VOCdevkit'), augment=True)
 
 num_gpus = torch.cuda.device_count()
