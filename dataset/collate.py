@@ -51,4 +51,9 @@ def resize_collate(batch):
 
     # Normalise images
     batched_images = (batched_images / 256 - cfg.NETWORK.PIXEL_MEANS) / cfg.NETWORK.PIXEL_STDS
-    return torch.from_numpy(batched_images), batched_data
+    # TODO: check why it creates a double tensor
+    tensor_imgs = torch.from_numpy(batched_images).float()
+    # Reorder NHWC to NCHW
+    # TODO: not sure that this is correct place to do it, check that
+    tensor_imgs = tensor_imgs.permute(0, 3, 1, 2)
+    return tensor_imgs, batched_data
