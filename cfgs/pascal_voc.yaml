@@ -1,0 +1,8 @@
+name: "pascal_voc"
+DATASET:
+  NAME: PASCAL_VOC
+
+TRAIN:
+  RESIZE_SCALES:
+    - 0.5
+    - 2.0
