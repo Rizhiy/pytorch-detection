@@ -12,6 +12,11 @@ cfg.name = ''
 cfg.NETWORK = edict()
 cfg.NETWORK.PIXEL_MEANS = (0.485, 0.456, 0.406)
 cfg.NETWORK.PIXEL_STDS = (0.229, 0.224, 0.225)
+# Parameters for feature extractor, not every feature extractor uses all parameters
+cfg.NETWORK.FEATURE_EXTRACTOR = edict()
+cfg.NETWORK.FEATURE_EXTRACTOR.TYPE = 'resnet'
+cfg.NETWORK.FEATURE_EXTRACTOR.DEPTH = 50
+cfg.NETWORK.FEATURE_EXTRACTOR.PRETRAINED = True
 
 cfg.DATASET = edict()
 cfg.DATASET.NAME = ''
