@@ -31,6 +31,6 @@ feature_extractor = create_feature_extractor(cfg.NETWORK.FEATURE_EXTRACTOR.TYPE,
 feature_refiner = nn.DataParallel(feature_extractor.feature_refiner.cuda())
 feature_extractor = nn.DataParallel(feature_extractor)
 
-for imgs, data in tqdm(train_loader):
+for imgs, img_data in tqdm(train_loader):
     features = feature_extractor(Variable(imgs, volatile=True).cuda())
     output = feature_refiner(features)

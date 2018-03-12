@@ -45,9 +45,9 @@ class IMDB(Dataset):
         return len(self.classes)
 
     @staticmethod
-    def augmentation(img: Image, data: dict) -> Tuple[Image.Image, dict]:
+    def augmentation(img: Image, img_data: dict) -> Tuple[Image.Image, dict]:
         # TODO: This augmentation is a bit suboptimal, need to improve it
-        shape = data['shape']
+        shape = img_data['shape']
         crop_scale = np.random.uniform(low=cfg.TRAIN.CROP_MIN_SCALE)
         resize_scale = np.random.uniform(*cfg.TRAIN.RESIZE_SCALES)
         # First crop the image a bit
@@ -62,12 +62,12 @@ class IMDB(Dataset):
 
         # TODO: Check that all boxes are inside the crop/delete ones outside
         # Update boxes
-        new_boxes = np.clip(data['boxes'] - [x, y, x, y], 0, np.inf) * resize_scale
+        new_boxes = np.clip(img_data['boxes'] - [x, y, x, y], 0, np.inf) * resize_scale
 
-        data.update({"scale": resize_scale,
+        img_data.update({"scale": resize_scale,
                      "shape": target_shape,
                      "boxes": new_boxes})
-        return img, data
+        return img, img_data
 
     def __len__(self):
         return len(self.img_index)
@@ -82,25 +82,25 @@ class IMDB(Dataset):
         true_idx = self._index_map[idx]
         img_path = self.img_index[true_idx]
         img_orig = Image.open(img_path)
-        data = self._img_data[true_idx]
+        img_data = self._img_data[true_idx]
 
-        if data['flipped']:
+        if img_data['flipped']:
             img_orig = img_orig.transpose(Image.FLIP_LEFT_RIGHT)
 
         # create overlaps
-        num_objs = len(data['classes'])
+        num_objs = len(img_data['classes'])
         overlaps = np.zeros((num_objs, self.num_classes), dtype=np.float32)
-        overlaps[np.arange(num_objs), data['classes']] = 1.
+        overlaps[np.arange(num_objs), img_data['classes']] = 1.
         overlaps = scipy.sparse.csr_matrix(overlaps)
-        data['overlaps'] = overlaps
+        img_data['overlaps'] = overlaps
 
-        assert (img_orig.size == data['shape']).all(), f"Image shape for {img_path} doesn't match stored shape"
+        assert (img_orig.size == img_data['shape']).all(), f"Image shape for {img_path} doesn't match stored shape"
 
         if self.augment:
-            img, data = self.augmentation(img_orig, data)
+            img, img_data = self.augmentation(img_orig, img_data)
         else:
-            img, data = img_orig, data
-        return img, data
+            img, img_data = img_orig, img_data
+        return img, img_data
 
     def _create_sorted_index(self):
         # shuffle img_index first, since sort is stable in python
