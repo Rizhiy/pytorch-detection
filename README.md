@@ -9,6 +9,12 @@ so I decided to make my own.
 ## Installation
 This project uses [PyTorch](http://pytorch.org/) 3.1 and Python 3.6
 
+I recommend using virtual environment to make sure correct versions of each package are installed.
+I made a script which completes all steps required for the installation, run it with:
+```bash
+bash make.sh
+```
+
 ### Dependecies
 Dependencies are listed in `requirements.txt`, to install with `pip` use:
 ```bash
