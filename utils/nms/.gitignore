@@ -1,5 +1,3 @@
-build/*
-dist/*
-nms.egg-info/*
-cpu_nms.c
-gpu_nms.cpp
+*.c
+*.cpp
+*.so
