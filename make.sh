@@ -7,3 +7,6 @@ pip install -r requirements.txt
 cd utils/nms
 bash make.sh
 cd ../..
+
+# Run tests
+python -m unittest
