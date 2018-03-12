@@ -14,3 +14,11 @@ Dependencies are listed in `requirements.txt`, to install with `pip` use:
 ```bash
 pip install -r requirements.txt
 ```
+
+### Cython extensions
+You also need to complile and install Cython extensions:
+```bash
+cd utils/nms
+python setup.py install
+cd ../..
+```
