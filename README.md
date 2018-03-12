@@ -1,5 +1,11 @@
 # pytorch-detection
 
+## Introduction
+I wanted to have an object-detection framework based on PyTorch, but couldn't find anything good enough.
+The closest I could find was [jwyang/faster-rcnn.pytorch](https://github.com/jwyang/faster-rcnn.pytorch),
+but I didn't like quite a few design decisions they made (such as wanting to support python2),
+so I decided to make my own.
+
 ## Installation
 This project uses [PyTorch](http://pytorch.org/) 3.1 and Python 3.6
 
