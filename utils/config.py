@@ -12,11 +12,18 @@ cfg.name = ''
 cfg.NETWORK = edict()
 cfg.NETWORK.PIXEL_MEANS = (0.485, 0.456, 0.406)
 cfg.NETWORK.PIXEL_STDS = (0.229, 0.224, 0.225)
-# Parameters for feature extractor, not every feature extractor uses all parameters
+# Parameters for feature extractor, not every feature extractor uses all of the parameters
 cfg.NETWORK.FEATURE_EXTRACTOR = edict()
 cfg.NETWORK.FEATURE_EXTRACTOR.TYPE = 'resnet'
 cfg.NETWORK.FEATURE_EXTRACTOR.DEPTH = 50
 cfg.NETWORK.FEATURE_EXTRACTOR.PRETRAINED = True
+
+# RPN settings
+cfg.NETWORK.RPN = edict()
+cfg.NETWORK.RPN.ANCHOR_SCALES = (8, 16, 32)
+cfg.NETWORK.RPN.ANCHOR_RATIOS = (0.5, 1.0, 2.0)
+# Number of filters to use in the intermediate layer
+cfg.NETWORK.RPN.FILTERS = 512
 
 cfg.DATASET = edict()
 cfg.DATASET.NAME = ''
@@ -29,6 +36,7 @@ cfg.DATASET.AUGMENT_TRAIN = True
 
 cfg.TRAIN = edict()
 
+# Main seed, if None then chosen at random
 cfg.TRAIN.SEED = None
 # Images will be scaled to fill the area
 cfg.TRAIN.MAX_AREA = 600 * 1000
@@ -41,9 +49,21 @@ cfg.TRAIN.RESIZE_SCALES = (0.5, 2.)
 # Minimum relative size to crop
 cfg.TRAIN.CROP_MIN_SCALE = 0.8
 
+# NMS
+cfg.TRAIN.RPN_NMS = edict()
+cfg.TRAIN.RPN_NMS.PRE_TOP_N = 12000
+cfg.TRAIN.RPN_NMS.THRESH = 0.7
+cfg.TRAIN.RPN_NMS.POST_TOP_N = 2000
+
 cfg.TEST = edict()
 
 cfg.TEST.INPUT_SIZE = 600
+
+# NMS
+cfg.TEST.RPN_NMS = edict()
+cfg.TEST.RPN_NMS.PRE_TOP_N = 12000
+cfg.TEST.RPN_NMS.THRESH = 0.7
+cfg.TEST.RPN_NMS.POST_TOP_N = 2000
 
 np.random.seed(cfg.TRAIN.SEED)
 
