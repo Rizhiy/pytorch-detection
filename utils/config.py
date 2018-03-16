@@ -1,12 +1,17 @@
 from pathlib import Path
+from typing import List
 
 import numpy as np
 import yaml
 from easydict import EasyDict as edict
 
+from collections import namedtuple
+
 cfg = edict()
 
 cfg.name = ''
+
+cfg.CUDA = True
 
 # Parameters for network architecture
 cfg.NETWORK = edict()
@@ -24,6 +29,9 @@ cfg.NETWORK.RPN.ANCHOR_SCALES = (8, 16, 32)
 cfg.NETWORK.RPN.ANCHOR_RATIOS = (0.5, 1.0, 2.0)
 # Number of filters to use in the intermediate layer
 cfg.NETWORK.RPN.FILTERS = 512
+# Minimum image size, this should be slightly larger than the size of the smallest anchor in pixels
+# TODO: make this a parameter in network
+cfg.NETWORK.MIN_SIZE = cfg.NETWORK.RPN.ANCHOR_SCALES[0] * (16 + 1)
 
 cfg.DATASET = edict()
 cfg.DATASET.NAME = ''
@@ -49,23 +57,49 @@ cfg.TRAIN.RESIZE_SCALES = (0.5, 2.)
 # Minimum relative size to crop
 cfg.TRAIN.CROP_MIN_SCALE = 0.8
 
+cfg.TRAIN.RPN = edict()
 # NMS
-cfg.TRAIN.RPN_NMS = edict()
-cfg.TRAIN.RPN_NMS.PRE_TOP_N = 12000
-cfg.TRAIN.RPN_NMS.THRESH = 0.7
-cfg.TRAIN.RPN_NMS.POST_TOP_N = 2000
+cfg.TRAIN.RPN.NMS = edict()
+cfg.TRAIN.RPN.NMS.PRE_TOP_N = 12000
+cfg.TRAIN.RPN.NMS.THRESH = 0.7
+cfg.TRAIN.RPN.NMS.POST_TOP_N = 2000
+
+# RPN training parameters
+cfg.TRAIN.RPN.NEGATIVE_OVERLAP = 0.3
+cfg.TRAIN.RPN.POSITIVE_OVERLAP = 0.7
+cfg.TRAIN.RPN.CLOBBER_POSITIVES = False
+cfg.TRAIN.RPN.BATCH_SIZE = 256
+cfg.TRAIN.RPN.FG_FRACTION = 0.5
+cfg.TRAIN.RPN.BBOX_INSIDE_WEIGHTS = (1.0, 1.0, 1.0, 1.0)
+cfg.TRAIN.RPN.POSITIVE_WEIGHT = -1
 
 cfg.TEST = edict()
 
 cfg.TEST.INPUT_SIZE = 600
 
+cfg.TEST.RPN = edict()
 # NMS
-cfg.TEST.RPN_NMS = edict()
-cfg.TEST.RPN_NMS.PRE_TOP_N = 12000
-cfg.TEST.RPN_NMS.THRESH = 0.7
-cfg.TEST.RPN_NMS.POST_TOP_N = 2000
+cfg.TEST.RPN.NMS = edict()
+cfg.TEST.RPN.NMS.PRE_TOP_N = 12000
+cfg.TEST.RPN.NMS.THRESH = 0.7
+cfg.TEST.RPN.NMS.POST_TOP_N = 2000
 
 np.random.seed(cfg.TRAIN.SEED)
+
+test = namedtuple('test', ('a',))
+
+
+def _get_tuples(d: dict) -> List[str]:
+    results = []
+    for k, v in d.items():
+        if isinstance(v, tuple):
+            results.append(k)
+        if isinstance(v, dict):
+            results += [k + '.' + x for x in _get_tuples(v)]
+    return results
+
+
+tuple_keys = _get_tuples(cfg)
 
 
 def update_config(config_path: Path):
@@ -78,9 +112,7 @@ def update_config(config_path: Path):
                 else:
                     # List special cases here
                     name = '.'.join(new_prefix)
-                    if name == 'TRAIN.RESIZE_SCALES' or \
-                            name == 'NETWORK.PIXEL_MEANS' or \
-                            name == 'NETWORK.PIXEL_STDS':
+                    if name in tuple_keys:
                         value = tuple(value)
                     elif name == 'DATASET.BASE_PATH':
                         value = Path(value)
@@ -91,3 +123,4 @@ def update_config(config_path: Path):
     with config_path.open() as config:
         exp_config = edict(yaml.load(config))
         parse_dict(cfg, exp_config, [])
+    np.random.seed(cfg.TRAIN.SEED)

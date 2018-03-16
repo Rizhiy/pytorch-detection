@@ -1,6 +1,6 @@
 numpy==1.14.1
-easydict==1.7
 scipy==1.0.0
 pyyaml==3.12
 tqdm==4.19.6
 Cython==0.27.3
+git+git://github.com/Rizhiy/easydict.git#egg=easydict
