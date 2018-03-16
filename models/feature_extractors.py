@@ -21,6 +21,13 @@ class FeatureExtractor(nn.Module):
         """
         raise NotImplementedError
 
+    @property
+    def feature_stride(self) -> int:
+        """
+        Ratio of feature pixel size to original pixels
+        """
+        raise NotImplementedError
+
     def forward(self, *input):
         raise NotImplementedError
 
@@ -37,8 +44,9 @@ class resnet(FeatureExtractor):
         if depth not in self._factory:
             raise ValueError(f"Unsupported depth for resnet: {depth}. Options: {list(self._factory.keys())}")
         self.resnet = self._factory[depth](pretrained)
-        self._num_out_filters = 512 * list(self.resnet.children())[-3][-1].expansion
+        self._num_out_filters = 512 * list(self.resnet.children())[-3][-1].expansion // 2
         self.features = nn.Sequential(*list(self.resnet.children())[:-3])
+        # TODO: Modifify this to have dilation
         self._refiner = list(self.resnet.children())[-3]
 
     @property
@@ -48,6 +56,10 @@ class resnet(FeatureExtractor):
     @property
     def feature_refiner(self) -> nn.Module:
         return self._refiner
+
+    @property
+    def feature_stride(self):
+        return 16
 
     def forward(self, input):
         return self.features(input)

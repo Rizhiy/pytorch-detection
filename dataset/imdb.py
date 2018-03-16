@@ -58,6 +58,12 @@ class IMDB(Dataset):
         img = img.crop((x, y, x + tw, y + th))
         # Then Scale
         target_shape = tuple((shape * resize_scale).astype(int))
+        # Check if image will be large enough
+        min_scale = min([x / cfg.NETWORK.MIN_SIZE for x in target_shape])
+        if min_scale < 1:
+            resize_scale /= min_scale
+            target_shape = tuple((shape * resize_scale).astype(int))
+        # TODO: check if this resizes correctly (no squeeze)
         img = img.resize(target_shape)
 
         # TODO: Check that all boxes are inside the crop/delete ones outside
@@ -65,8 +71,8 @@ class IMDB(Dataset):
         new_boxes = np.clip(img_data['boxes'] - [x, y, x, y], 0, np.inf) * resize_scale
 
         img_data.update({"scale": resize_scale,
-                     "shape": target_shape,
-                     "boxes": new_boxes})
+                         "shape": target_shape,
+                         "boxes": new_boxes})
         return img, img_data
 
     def __len__(self):

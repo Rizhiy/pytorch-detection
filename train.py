@@ -2,14 +2,15 @@ import argparse
 from pathlib import Path
 
 import torch
-from torch import nn
 from torch.autograd import Variable
+from torch.nn import DataParallel
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from dataset import create_dataset
 from dataset.collate import resize_collate
 from models import create_feature_extractor
+from models.faster_rcnn import FasterRCNN
 from utils.config import update_config, cfg
 
 parser = argparse.ArgumentParser(description="Train a network",
@@ -28,9 +29,16 @@ train_loader = DataLoader(train_imdb, batch_size=num_gpus * cfg.TRAIN.BATCH_IMAG
 feature_extractor = create_feature_extractor(cfg.NETWORK.FEATURE_EXTRACTOR.TYPE,
                                              pretrained=cfg.NETWORK.FEATURE_EXTRACTOR.PRETRAINED,
                                              depth=cfg.NETWORK.FEATURE_EXTRACTOR.DEPTH).cuda()
-feature_refiner = nn.DataParallel(feature_extractor.feature_refiner.cuda())
-feature_extractor = nn.DataParallel(feature_extractor)
+net = FasterRCNN(feature_extractor)
+if cfg.CUDA:
+    net = DataParallel(net.cuda())
 
-for imgs, img_data in tqdm(train_loader):
-    features = feature_extractor(Variable(imgs, volatile=True).cuda())
-    output = feature_refiner(features)
+for imgs, img_info, boxes in tqdm(train_loader):
+    input_imgs = Variable(imgs, volatile=True)
+    input_info = Variable(img_info, volatile=True)
+    input_boxes = Variable(boxes, volatile=True)
+
+    if cfg.CUDA:
+        input_imgs, input_info, input_boxes = input_imgs.cuda(), input_info.cuda(), input_boxes.cuda()
+
+    output = net(input_imgs, input_info, input_boxes)
