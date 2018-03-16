@@ -31,7 +31,7 @@ class ProposalLayer(nn.Module):
         self._anchors = torch.from_numpy(generate_anchors(scales=np.array(scales), ratios=np.array(ratios))).float()
         self._num_anchors = self._anchors.size(0)
 
-    def forward(self, input):
+    def forward(self, scores, bbox_deltas, img_info, gt_boxes):
 
         # Algorithm:
         #
@@ -48,14 +48,12 @@ class ProposalLayer(nn.Module):
 
         # the first set of _num_anchors channels are bg probs
         # the second set are the fg probs
-        scores = input[0][:, self._num_anchors:, :, :]
-        bbox_deltas = input[1]
-        im_info = input[2]
-        cfg_key = input[3]
+        scores = scores[:, self._num_anchors:, :, :]
+        cfg_key = 'TRAIN' if self.training else 'TEST'
 
-        pre_nms_topN = cfg[cfg_key].RPN_PRE_NMS_TOP_N
-        post_nms_topN = cfg[cfg_key].RPN_POST_NMS_TOP_N
-        nms_thresh = cfg[cfg_key].RPN_NMS_THRESH
+        pre_nms_topN = cfg[cfg_key].RPN.NMS.PRE_TOP_N
+        post_nms_topN = cfg[cfg_key].RPN.NMS.POST_TOP_N
+        nms_thresh = cfg[cfg_key].RPN.NMS.THRESH
 
         batch_size = bbox_deltas.size(0)
 
@@ -89,7 +87,7 @@ class ProposalLayer(nn.Module):
         proposals = self.bbox_transform_inv(anchors, bbox_deltas)
 
         # 2. clip predicted boxes to image
-        proposals = clip_boxes(proposals, im_info, batch_size)
+        proposals = clip_boxes(proposals, img_info, batch_size)
 
         # TODO: We also supposed to filter boxes that are too small
 
