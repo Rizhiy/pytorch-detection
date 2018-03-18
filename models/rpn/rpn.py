@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import torch
 from torch import nn
 from torch.autograd import Variable
@@ -33,14 +35,14 @@ class RPN(nn.Module):
         self.proposal_layer = ProposalLayer(feat_stride, cfg.NETWORK.RPN.ANCHOR_SCALES, cfg.NETWORK.RPN.ANCHOR_RATIOS)
         self.anchor_target_layer = AnchorTargetLayer(feat_stride, cfg.NETWORK.RPN.ANCHOR_SCALES,
                                                      cfg.NETWORK.RPN.ANCHOR_RATIOS)
-        self.cls_loss = 0
-        self.box_loss = 0
+        self.cls_loss = 0.
+        self.box_loss = 0.
 
     @property
     def _num_anchors(self) -> int:
         return len(self.anchor_ratios) * len(self.anchor_scales)
 
-    def forward(self, features, img_info, gt_boxes):
+    def forward(self, features, img_info, gt_boxes) -> Tuple[Variable, float, float]:
         batch_size = features.size(0)
 
         conv = F.relu(self.conv(features))
@@ -56,8 +58,12 @@ class RPN(nn.Module):
 
         rois = self.proposal_layer(cls_prob.data, bbox_pred.data, img_info, gt_boxes)
 
+        self.cls_loss = 0.
+        self.box_loss = 0.
+
         if self.training:
-            labels, rpn_bbox_targets, rpn_bbox_inside_weights, rpn_bbox_outside_weights = self.anchor_target_layer(cls_score.data, img_info, gt_boxes)
+            labels, rpn_bbox_targets, rpn_bbox_inside_weights, rpn_bbox_outside_weights = self.anchor_target_layer(
+                cls_score.data, img_info, gt_boxes)
 
             # compute classification loss
             rpn_cls_score = cls_score_reshape.permute(0, 2, 3, 1).contiguous().view(batch_size, -1, 2)

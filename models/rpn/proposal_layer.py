@@ -31,7 +31,7 @@ class ProposalLayer(nn.Module):
         self._anchors = torch.from_numpy(generate_anchors(scales=np.array(scales), ratios=np.array(ratios))).float()
         self._num_anchors = self._anchors.size(0)
 
-    def forward(self, scores, bbox_deltas, img_info, gt_boxes):
+    def forward(self, scores, bbox_deltas, img_info, gt_boxes) -> torch.FloatTensor:
 
         # Algorithm:
         #
