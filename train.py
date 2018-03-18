@@ -29,7 +29,7 @@ train_loader = DataLoader(train_imdb, batch_size=num_gpus * cfg.TRAIN.BATCH_IMAG
 feature_extractor = create_feature_extractor(cfg.NETWORK.FEATURE_EXTRACTOR.TYPE,
                                              pretrained=cfg.NETWORK.FEATURE_EXTRACTOR.PRETRAINED,
                                              depth=cfg.NETWORK.FEATURE_EXTRACTOR.DEPTH).cuda()
-net = FasterRCNN(feature_extractor)
+net = FasterRCNN(feature_extractor, train_imdb.num_classes)
 if cfg.CUDA:
     net = DataParallel(net.cuda())
 
