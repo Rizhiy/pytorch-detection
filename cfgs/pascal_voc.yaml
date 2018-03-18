@@ -7,3 +7,4 @@ TRAIN:
   RESIZE_SCALES:
     - 0.5
     - 2.0
+  SEED: 42
