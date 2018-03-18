@@ -1,3 +1,6 @@
 *.c
 *.cpp
 *.so
+nms.egg-info/*
+dist/*
+
