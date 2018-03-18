@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Any
 
 import torch
 from torch import nn
@@ -85,4 +85,8 @@ class RPN(nn.Module):
             self.box_loss = smooth_l1_loss(bbox_pred, rpn_bbox_targets, rpn_bbox_inside_weights,
                                            rpn_bbox_outside_weights, sigma=3, dim=[1, 2, 3])
 
-        return rois, self.cls_loss, self.box_loss
+        return rois
+
+    @property
+    def losses(self) -> Tuple[Any, Any]:
+        return self.cls_loss, self.box_loss
