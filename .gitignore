@@ -1,4 +1,9 @@
 .idea/*
 data
 cache/*
+
+# Compiled files
+*.o
+*.so
 *.pyc
+
