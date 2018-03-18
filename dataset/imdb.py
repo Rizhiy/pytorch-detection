@@ -5,7 +5,7 @@ from typing import List, Tuple
 import numpy as np
 import scipy.sparse
 from PIL import Image
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, ConcatDataset
 
 from utils.config import cfg
 
@@ -132,3 +132,11 @@ class IMDB(Dataset):
         'flipped': whether the image should be flipped around horizontal axis
         """
         raise NotImplementedError
+
+
+class CombinedDataset(ConcatDataset):
+    def __init__(self, datasets: List[IMDB]):
+        super().__init__(datasets)
+        dclasses = [x.classes for x in datasets]
+        assert dclasses.count(dclasses[0]) == len(dclasses), "Datasets have different classes!"
+        self.num_classes = datasets[0].num_classes
