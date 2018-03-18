@@ -1,11 +1,10 @@
+from collections import namedtuple
 from pathlib import Path
 from typing import List
 
 import numpy as np
 import yaml
 from easydict import EasyDict as edict
-
-from collections import namedtuple
 
 cfg = edict()
 
@@ -56,6 +55,16 @@ cfg.TRAIN.WORKERS = 2
 cfg.TRAIN.RESIZE_SCALES = (0.5, 2.)
 # Minimum relative size to crop
 cfg.TRAIN.CROP_MIN_SCALE = 0.8
+# Minibatch size (number of regions of interest [ROIs] to backprop)
+cfg.TRAIN.BATCH_SIZE = 128
+# Fraction of minibatch that is labeled foreground (i.e. class > 0)
+cfg.TRAIN.FG_FRACTION = 0.25
+# Overlap threshold for a ROI to be considered foreground (if >= FG_THRESH)
+cfg.TRAIN.FG_THRESH = 0.5
+# Overlap threshold for a ROI to be considered background (class = 0 if
+# overlap in [LO, HI))
+cfg.TRAIN.BG_THRESH_HI = 0.5
+cfg.TRAIN.BG_THRESH_LO = 0.1
 
 cfg.TRAIN.RPN = edict()
 # NMS
@@ -72,6 +81,17 @@ cfg.TRAIN.RPN.BATCH_SIZE = 256
 cfg.TRAIN.RPN.FG_FRACTION = 0.5
 cfg.TRAIN.RPN.BBOX_INSIDE_WEIGHTS = (1.0, 1.0, 1.0, 1.0)
 cfg.TRAIN.RPN.POSITIVE_WEIGHT = -1
+
+# Proposal Target Layer Params
+cfg.TRAIN.BBOX = edict()
+# Normalize the targets (subtract empirical mean, divide by empirical stddev)
+cfg.TRAIN.BBOX.NORMALIZE_TARGETS = True
+# Normalize the targets using "precomputed" (or made up) means and stdevs
+cfg.TRAIN.BBOX.NORMALIZE_TARGETS_PRECOMPUTED = True
+cfg.TRAIN.BBOX.NORMALIZE_MEANS = (0.0, 0.0, 0.0, 0.0)
+cfg.TRAIN.BBOX.NORMALIZE_STDS = (0.1, 0.1, 0.2, 0.2)
+# Deprecated (inside weights)
+cfg.TRAIN.BBOX.INSIDE_WEIGHTS = (1.0, 1.0, 1.0, 1.0)
 
 cfg.TEST = edict()
 
