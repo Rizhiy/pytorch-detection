@@ -31,6 +31,11 @@ cfg.NETWORK.RPN.FILTERS = 512
 # Minimum image size, this should be slightly larger than the size of the smallest anchor in pixels
 # TODO: make this a parameter in network
 cfg.NETWORK.MIN_SIZE = cfg.NETWORK.RPN.ANCHOR_SCALES[0] * (16 + 1)
+# RoIPooling
+cfg.NETWORK.POOLING_SIZE = 7
+# Whether bbox prediction is class agnostic
+cfg.NETWORK.CLASS_AGNOSTIC = True
+
 
 cfg.DATASET = edict()
 cfg.DATASET.NAME = ''
@@ -55,7 +60,7 @@ cfg.TRAIN.WORKERS = 2
 cfg.TRAIN.RESIZE_SCALES = (0.5, 2.)
 # Minimum relative size to crop
 cfg.TRAIN.CROP_MIN_SCALE = 0.8
-# Minibatch size (number of regions of interest [ROIs] to backprop)
+# Minibatch size (number of regions of interest [ROIs] to backprop) per image
 cfg.TRAIN.BATCH_SIZE = 128
 # Fraction of minibatch that is labeled foreground (i.e. class > 0)
 cfg.TRAIN.FG_FRACTION = 0.25
