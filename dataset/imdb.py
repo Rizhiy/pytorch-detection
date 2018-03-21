@@ -1,11 +1,12 @@
 import pickle
+from copy import deepcopy
 from pathlib import Path
 from typing import List, Tuple
 
 import numpy as np
 import scipy.sparse
 from PIL import Image
-from torch.utils.data import Dataset, ConcatDataset
+from torch.utils.data import ConcatDataset, Dataset
 
 from utils.config import cfg
 
@@ -37,7 +38,6 @@ class IMDB(Dataset):
             self._img_data = self._create_img_data()
             pickle.dump(self._img_data, self._cache_path.open('wb'))
             print(f"Saved {self.name} cache to {self._cache_path}")
-
         self._index_map = self._create_sorted_index()
 
     @property
@@ -132,6 +132,13 @@ class IMDB(Dataset):
         'flipped': whether the image should be flipped around horizontal axis
         """
         raise NotImplementedError
+
+    def create_flipped(self) -> 'IMDB':
+        new = deepcopy(self)
+        for idx, data in enumerate(new._img_data):
+            data['boxes'][:, [2, 0]] = data['shape'][0] - data['boxes'][:, [0, 2]]
+            data['flipped'] = True
+        return new
 
 
 class CombinedDataset(ConcatDataset):

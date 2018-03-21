@@ -36,7 +36,6 @@ cfg.NETWORK.POOLING_SIZE = 7
 # Whether bbox prediction is class agnostic
 cfg.NETWORK.CLASS_AGNOSTIC = True
 
-
 cfg.DATASET = edict()
 cfg.DATASET.NAME = ''
 cfg.DATASET.CACHE_FOLDER = 'cache'
@@ -50,8 +49,16 @@ cfg.TRAIN = edict()
 
 # Main seed, if None then chosen at random
 cfg.TRAIN.SEED = None
+# Number of epochs to train
+cfg.TRAIN.EPOCHS = 1
+# Optimiser settings
+cfg.TRAIN.LEARNING_RATE = 0.001
+cfg.TRAIN.MOMENTUM = 0.9
+cfg.TRAIN.WEIGHT_DECAY = 0.0005
+# Whether to flip images
+cfg.TRAIN.FLIP = True
 # Images will be scaled to fill the area
-cfg.TRAIN.MAX_AREA = 600 * 1000
+cfg.TRAIN.MAX_AREA = 650_000
 # Images per GPU
 cfg.TRAIN.BATCH_IMAGES = 2
 # Workers per GPU
@@ -69,7 +76,7 @@ cfg.TRAIN.FG_THRESH = 0.5
 # Overlap threshold for a ROI to be considered background (class = 0 if
 # overlap in [LO, HI))
 cfg.TRAIN.BG_THRESH_HI = 0.5
-cfg.TRAIN.BG_THRESH_LO = 0.1
+cfg.TRAIN.BG_THRESH_LO = 0.0
 
 cfg.TRAIN.RPN = edict()
 # NMS

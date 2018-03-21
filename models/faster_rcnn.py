@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -27,16 +29,13 @@ class FasterRCNN(nn.Module):
                                   (1 if cfg.NETWORK.CLASS_AGNOSTIC else num_classes) * 4)
         self.cls_pred = nn.Linear(feature_extractor.num_out_filters * 2, num_classes)
 
-        self.cls_loss = 0.
-        self.box_loss = 0.
-
-    def forward(self, imgs, img_info, gt_boxes):
+    def forward(self, imgs, img_info, gt_boxes) -> Tuple[Variable, Variable, Tuple]:
         batch_size = imgs.size(0)
 
         img_info = img_info.data
         gt_boxes = gt_boxes.data
         features = self.feature_extractor(imgs)
-        rois = self.rpn(features, img_info, gt_boxes)
+        rois, rpn_losses = self.rpn(features, img_info, gt_boxes)
 
         if self.training:
             rois, rois_label, rois_target, rois_inside_ws, rois_outside_ws = self.proposal_target_layer(rois, gt_boxes)
@@ -69,23 +68,20 @@ class FasterRCNN(nn.Module):
         cls_pred = self.cls_pred(final_features)
         cls_prob = F.softmax(cls_pred, dim=1)
 
-        self.cls_loss = 0.
-        self.box_loss = 0.
+        # TODO: this is a bit ugly, find a better way
+        cls_loss = 0.
+        box_loss = 0.
+
         if self.training:
             # Classification Loss
-            self.cls_loss = F.cross_entropy(cls_pred, rois_label)
+            cls_loss = F.cross_entropy(cls_pred, rois_label)
             # Regression Loss
-            self.box_loss = smooth_l1_loss(box_pred, rois_target, rois_inside_ws, rois_outside_ws)
-
+            box_loss = smooth_l1_loss(box_pred, rois_target, rois_inside_ws, rois_outside_ws)
         # Map back to original images
         cls_prob = cls_prob.view(batch_size, rois.size(1), -1)
         box_pred = box_pred.view(batch_size, rois.size(1), -1)
 
-        return cls_prob, box_pred
-
-    @property
-    def losses(self):
-        return self.cls_loss, self.box_loss
+        return cls_prob, box_pred, (cls_loss, box_loss, *rpn_losses)
 
     def _heavy_head(self, pooled_features):
         # This is not how it is implemented in paper

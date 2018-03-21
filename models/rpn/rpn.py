@@ -1,4 +1,4 @@
-from typing import Tuple, Any
+from typing import Tuple
 
 import torch
 from torch import nn
@@ -35,14 +35,12 @@ class RPN(nn.Module):
         self.proposal_layer = ProposalLayer(feat_stride, cfg.NETWORK.RPN.ANCHOR_SCALES, cfg.NETWORK.RPN.ANCHOR_RATIOS)
         self.anchor_target_layer = AnchorTargetLayer(feat_stride, cfg.NETWORK.RPN.ANCHOR_SCALES,
                                                      cfg.NETWORK.RPN.ANCHOR_RATIOS)
-        self.cls_loss = 0.
-        self.box_loss = 0.
 
     @property
     def _num_anchors(self) -> int:
         return len(self.anchor_ratios) * len(self.anchor_scales)
 
-    def forward(self, features, img_info, gt_boxes) -> Tuple[Variable, float, float]:
+    def forward(self, features, img_info, gt_boxes) -> Tuple[Variable, Tuple]:
         batch_size = features.size(0)
 
         conv = F.relu(self.conv(features))
@@ -58,8 +56,8 @@ class RPN(nn.Module):
 
         rois = self.proposal_layer(cls_prob.data, bbox_pred.data, img_info, gt_boxes)
 
-        self.cls_loss = 0.
-        self.box_loss = 0.
+        cls_loss = 0.
+        box_loss = 0.
 
         if self.training:
             labels, rpn_bbox_targets, rpn_bbox_inside_weights, rpn_bbox_outside_weights = self.anchor_target_layer(
@@ -73,7 +71,7 @@ class RPN(nn.Module):
             rpn_cls_score = torch.index_select(rpn_cls_score.view(-1, 2), 0, rpn_keep)
             rpn_label = torch.index_select(rpn_label.view(-1), 0, rpn_keep.data)
             rpn_label = Variable(rpn_label.long())
-            self.cls_loss = F.cross_entropy(rpn_cls_score, rpn_label)
+            cls_loss = F.cross_entropy(rpn_cls_score, rpn_label)
             fg_cnt = torch.sum(rpn_label.data.ne(0))
 
             # compute bbox regression loss
@@ -82,11 +80,7 @@ class RPN(nn.Module):
             rpn_bbox_targets = Variable(rpn_bbox_targets)
 
             # TODO: replace custom loss, with loss provided by PyTorch
-            self.box_loss = smooth_l1_loss(bbox_pred, rpn_bbox_targets, rpn_bbox_inside_weights,
-                                           rpn_bbox_outside_weights, sigma=3, dim=[1, 2, 3])
+            box_loss = smooth_l1_loss(bbox_pred, rpn_bbox_targets, rpn_bbox_inside_weights,
+                                      rpn_bbox_outside_weights, sigma=3, dim=[1, 2, 3])
 
-        return rois
-
-    @property
-    def losses(self) -> Tuple[Any, Any]:
-        return self.cls_loss, self.box_loss
+        return rois, (cls_loss, box_loss)

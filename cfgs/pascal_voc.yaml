@@ -8,3 +8,5 @@ TRAIN:
     - 0.5
     - 2.0
   SEED: 42
+  EPOCHS: 7
+  FLIP: False
