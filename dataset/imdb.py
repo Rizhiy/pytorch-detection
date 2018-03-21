@@ -50,12 +50,16 @@ class IMDB(Dataset):
         shape = img_data['shape']
         crop_scale = np.random.uniform(low=cfg.TRAIN.CROP_MIN_SCALE)
         resize_scale = np.random.uniform(*cfg.TRAIN.RESIZE_SCALES)
+
         # First crop the image a bit
         w, h = shape
         tw, th = tuple((shape * crop_scale).astype(int))
         x = np.random.randint(0, w - tw)
         y = np.random.randint(0, h - th)
+
         img = img.crop((x, y, x + tw, y + th))
+        shape = np.array((tw, th))
+
         # Then Scale
         target_shape = tuple((shape * resize_scale).astype(int))
         # Check if image will be large enough
@@ -73,6 +77,7 @@ class IMDB(Dataset):
         img_data.update({"scale": resize_scale,
                          "shape": target_shape,
                          "boxes": new_boxes})
+
         return img, img_data
 
     def __len__(self):

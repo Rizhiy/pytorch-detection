@@ -19,8 +19,9 @@ def resize_collate(batch):
 
     # Check if images at full size will fit and if not, find maximum possible size
     max_area = max_shape[0] * max_shape[1]
-    batched_info = [None] * len(batch)
-    batched_boxes = [None] * len(batch)
+    batched_info = [[]] * len(batch)
+    batched_boxes = [[]] * len(batch)
+
     if max_area > cfg.TRAIN.MAX_AREA:
         resize_factor = np.sqrt(cfg.TRAIN.MAX_AREA / max_area)
         max_shape = np.floor(max_shape * resize_factor)
@@ -33,8 +34,8 @@ def resize_collate(batch):
             img_resize_factor = np.max(img_data['shape'] / max_shape)
             target_size = (img_data['shape'] / img_resize_factor).astype(int)
             new_img = img.resize(target_size)
-            new_boxes = img_data['boxes'] * img_resize_factor
-            new_scale = img_data['scale'] * img_resize_factor
+            new_boxes = img_data['boxes'] / img_resize_factor
+            new_scale = img_data['scale'] / img_resize_factor
             new_shape = new_img.size
             new_info = (*new_shape, new_scale)
             batched_images[idx, :new_shape[1], :new_shape[0], :] = np.array(new_img)
