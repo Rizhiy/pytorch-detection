@@ -5,6 +5,7 @@ from pathlib import Path
 import torch
 from torch.autograd import Variable
 from torch.nn import DataParallel
+from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -45,10 +46,13 @@ def train(batch_images: int):
                            'weight_decay': 0 if 'bias' in name else cfg.TRAIN.WEIGHT_DECAY})
     optimiser = torch.optim.SGD(params, momentum=cfg.TRAIN.MOMENTUM)
 
+    # Reduce lr on after few epoch
+    scheduler = MultiStepLR(optimiser, milestones=[4, 6], gamma=0.1)
     # TODO: Add resume mechanic
 
-    avg_loss = 4
+    avg_loss = 2
     for epoch in range(cfg.TRAIN.EPOCHS):
+        scheduler.step()
         print(f"Starting epoch {epoch}")
         for idx, (imgs, img_info, boxes) in enumerate(tqdm(train_loader)):
 
@@ -61,18 +65,15 @@ def train(batch_images: int):
 
             _, _, losses = net(input_imgs, input_info, input_boxes)
             # Calculate loss
-            # avg_loss = avg_loss * 0.98 + loss.data * 0.02
-            # head_cls_loss, head_box_loss = net.module.losses
-            # rpn_cls_loss, rpn_box_loss = net.module.rpn.losses
-            # loss = head_cls_loss + head_box_loss + rpn_cls_loss + rpn_box_loss
             # TODO: test sum()
             loss = losses[0].mean() + losses[1].mean() + losses[2].mean() + losses[3].mean()
             avg_loss = avg_loss * 0.99 + loss.data[0] * 0.01
+
             # Backprop
             optimiser.zero_grad()
             loss.backward()
             optimiser.step()
-            time.sleep(1)
+
         print(f"Epoch={epoch}, Loss={avg_loss}")
 
 

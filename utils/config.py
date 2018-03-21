@@ -58,7 +58,7 @@ cfg.TRAIN.WEIGHT_DECAY = 0.0005
 # Whether to flip images
 cfg.TRAIN.FLIP = True
 # Images will be scaled to fill the area
-cfg.TRAIN.MAX_AREA = 650_000
+cfg.TRAIN.MAX_AREA = 600_000
 # Images per GPU
 cfg.TRAIN.BATCH_IMAGES = 2
 # Workers per GPU

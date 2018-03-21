@@ -9,4 +9,4 @@ TRAIN:
     - 2.0
   SEED: 42
   EPOCHS: 7
-  FLIP: False
+  MAX_AREA: 650_000
