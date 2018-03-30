@@ -13,6 +13,7 @@ from utils.config import cfg
 
 class IMDB(Dataset):
     def __init__(self, name: str, img_set: str, classes: List[str], base_path: Path, augment=False):
+        # TODO: add argument for sorting by aspect ratio
         """
         Base Image Database class
         :param name: name of the dataset
@@ -144,6 +145,108 @@ class IMDB(Dataset):
             data['boxes'][:, [2, 0]] = data['shape'][0] - data['boxes'][:, [0, 2]]
             data['flipped'] = True
         return new
+
+    def evaluate(self, boxes: List[np.array]) -> float:
+        # Evaluate calculated boxes using some kind of metric
+        return self.calculate_mAP(boxes)
+
+    def calculateAP(self, boxes: List[np.array], cls: int, ovthresh: float = 0.5) -> float:
+        # extract gt objects for this class
+        gt_boxes = []
+        npos = 0
+        for img_data in self._img_data:
+            img_boxes = [x[1] for x in zip(img_data['classes'], img_data['boxes']) if x[0] == cls]
+            gt_boxes.append({'boxes': np.array(img_boxes),
+                             'detected': [False] * len(img_boxes)})
+
+        # read dets
+
+        # flatten_boxes
+        img_idxs = []
+        boxes = []
+        for img_idx, img_boxes in enumerate(boxes):
+            for box in img_boxes:
+                if box[-1] == cls:
+                    img_idxs.append(img_idx)
+                    boxes.append(box)
+
+        # sort by confidence
+        img_idxs, boxes = zip(*sorted(zip(img_idxs, boxes), key=lambda x: x[1][-1]))
+
+        boxes = np.array(boxes)
+
+        nd = len(boxes)
+        tp = np.zeros(nd)
+        fp = np.zeros(nd)
+
+        # go down dets and mark TPs and FPs
+        for idx, (img_idx, box) in enumerate(zip(img_idxs, boxes)):
+            ovmax = -np.inf
+            img_data = self._img_data[img_idx]
+            # TODO: create gtbb array first beforhand
+            gt = gt_boxes[img_idx]['boxes']
+
+            if gt:
+                ixmin = np.maximum(gt[:, 0], box[0])
+                iymin = np.maximum(gt[:, 1], box[1])
+                ixmax = np.minimum(gt[:, 2], box[2])
+                iymax = np.minimum(gt[:, 3], box[3])
+                iw = np.maximum(ixmax - ixmin + 1., 0.)
+                ih = np.maximum(iymax - iymin + 1., 0.)
+                inters = iw * ih
+
+                # union
+                uni = ((box[2] - box[0] + 1.) * (box[3] - box[1] + 1.) +
+                       (gt[:, 2] - gt[:, 0] + 1.) *
+                       (gt[:, 3] - gt[:, 1] + 1.) - inters)
+
+                overlaps = inters / uni
+                ovmax = np.max(overlaps)
+                jmax = np.argmax(overlaps)
+
+            if ovmax > ovthresh and not gt_boxes[img_idx]['det']:
+                tp[idx] = 1.
+                gt_boxes[img_idx]['det'] = True
+            else:
+                fp[idx] = 1.
+
+        # compute precision recall
+        fp = np.cumsum(fp)
+        tp = np.cumsum(tp)
+        rec = tp / float(npos)
+        # avoid divide by zero in case the first detection matches a difficult
+        # ground truth
+        prec = tp / np.maximum(tp + fp, np.finfo(np.float64).eps)
+
+        # correct AP calcuation
+        # first append sentinel values at the end
+        mrec = np.concatenate([[0.], rec, [1.0]])
+        mpre = np.concatenate([[0.], prec, [0.0]])
+
+        # compute the precision envelope
+        # TODO: check that this is a valid operation
+        for i in range(mpre.size - 1, 0, -1):
+            mpre[i - 1] = np.maximum(mpre[i - 1], mpre[i])
+
+        # to calculate area under PR curve, look for points where recall changes value
+        i = np.where(mrec[1:] != mrec[:-1])[0]
+
+        # sum(\Delta recall) * prec
+        ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
+
+        return ap
+
+    def calculate_mAP(self, boxes):
+        aps = []
+        for idx, cls in enumerate(self.classes):
+            if cls == 'background':
+                continue
+            ap = self.calculateAP(boxes, cls)
+            aps.append(ap)
+            print(f"AP for {cls} = {ap:.4f}")
+        mAP = np.mean(aps)
+        print(f"Mean AP = {mAP:.4f}")
+        return mAP
 
 
 class CombinedDataset(ConcatDataset):
