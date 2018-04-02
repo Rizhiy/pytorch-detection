@@ -1,4 +1,4 @@
-name: "pascal_voc"
+NAME: "pascal_voc_box_loss"
 DATASET:
   NAME: PASCAL_VOC
   BASE_PATH: "data/VOCdevkit"
@@ -10,3 +10,6 @@ TRAIN:
   SEED: 42
   EPOCHS: 7
   MAX_AREA: 650_000
+
+TEST:
+  EPOCH: 7

@@ -8,9 +8,11 @@ from easydict import EasyDict as edict
 
 cfg = edict()
 
-cfg.name = ''
+cfg.NAME = ''
 
 cfg.CUDA = True
+# Output folder, training data and logs will be placed in cfg.OUTPUT/cfg.name/<files>
+cfg.OUTPUT = 'output'
 
 # Parameters for network architecture
 cfg.NETWORK = edict()
@@ -41,6 +43,7 @@ cfg.DATASET.NAME = ''
 cfg.DATASET.CACHE_FOLDER = 'cache'
 cfg.DATASET.IMG_CHANNELS = 3
 cfg.DATASET.TRAIN_SETS = ['train']
+# TODO: Maybe allow testing on multiple sets
 cfg.DATASET.TEST_SET = 'test'
 cfg.DATASET.BASE_PATH = None
 cfg.DATASET.AUGMENT_TRAIN = True
@@ -52,7 +55,7 @@ cfg.TRAIN.SEED = None
 # Number of epochs to train
 cfg.TRAIN.EPOCHS = 1
 # Optimiser settings
-cfg.TRAIN.LEARNING_RATE = 0.001
+cfg.TRAIN.LEARNING_RATE = 0.01
 cfg.TRAIN.MOMENTUM = 0.9
 cfg.TRAIN.WEIGHT_DECAY = 0.0005
 # Whether to flip images
@@ -61,8 +64,6 @@ cfg.TRAIN.FLIP = True
 cfg.TRAIN.MAX_AREA = 600_000
 # Images per GPU
 cfg.TRAIN.BATCH_IMAGES = 2
-# Workers per GPU
-cfg.TRAIN.WORKERS = 2
 # Range of scales to train on, remember that images will be rescaled down to fit in memory
 cfg.TRAIN.RESIZE_SCALES = (0.5, 2.)
 # Minimum relative size to crop
@@ -106,6 +107,8 @@ cfg.TRAIN.BBOX.NORMALIZE_STDS = (0.1, 0.1, 0.2, 0.2)
 cfg.TRAIN.BBOX.INSIDE_WEIGHTS = (1.0, 1.0, 1.0, 1.0)
 
 cfg.TEST = edict()
+
+cfg.TEST.EPOCH = cfg.TRAIN.EPOCHS
 
 cfg.TEST.INPUT_SIZE = 600
 

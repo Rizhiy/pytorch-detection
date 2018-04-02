@@ -71,7 +71,7 @@ class RPN(nn.Module):
             rpn_cls_score = torch.index_select(rpn_cls_score.view(-1, 2), 0, rpn_keep)
             rpn_label = torch.index_select(rpn_label.view(-1), 0, rpn_keep.data)
             rpn_label = Variable(rpn_label.long())
-            cls_loss = F.cross_entropy(rpn_cls_score, rpn_label)
+            cls_loss = F.cross_entropy(rpn_cls_score, rpn_label, ignore_index=-1)
             fg_cnt = torch.sum(rpn_label.data.ne(0))
 
             # compute bbox regression loss

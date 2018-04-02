@@ -6,20 +6,19 @@ from typing import List, Tuple
 import numpy as np
 import scipy.sparse
 from PIL import Image
-from torch.utils.data import ConcatDataset, Dataset
+from torch.utils.data import Dataset
 
 from utils.config import cfg
 
 
 class IMDB(Dataset):
-    def __init__(self, name: str, img_set: str, classes: List[str], base_path: Path, augment=False):
+    def __init__(self, name: str, img_set: str, classes: List[str], augment=False):
         # TODO: add argument for sorting by aspect ratio
         """
         Base Image Database class
         :param name: name of the dataset
         :param img_set: name of the subset
         :param classes: list of names for each class in the dataset, without background
-        :param base_path: path to the root directory of the dataset
         :param augment: whether to augment the data
         """
         super().__init__()
@@ -27,17 +26,18 @@ class IMDB(Dataset):
         self.img_set = img_set
         self.augment = augment
         self.classes = ['__background__', *classes]
-        self._base_path = base_path
         self.img_index = self._create_img_index()
-        self._cache_path = Path(cfg.DATASET.CACHE_FOLDER) / (self.name + '.pkl')
+        self._cache_path = Path(cfg.DATASET.CACHE_FOLDER) / (self.name + '_' + self.img_set + '.pkl')
 
         if self._cache_path.exists():
-            self._img_data = pickle.load(self._cache_path.open('rb'))
+            with self._cache_path.open('rb') as cache_file:
+                self._img_data = pickle.load(cache_file)
             print(f"Loaded {self.name} cache from {self._cache_path}")
         else:
             self._cache_path.parent.mkdir(exist_ok=True)
             self._img_data = self._create_img_data()
-            pickle.dump(self._img_data, self._cache_path.open('wb'))
+            with self._cache_path.open('wb') as cache_file:
+                pickle.dump(self._img_data, cache_file)
             print(f"Saved {self.name} cache to {self._cache_path}")
         self._index_map = self._create_sorted_index()
 
@@ -99,6 +99,7 @@ class IMDB(Dataset):
         if img_data['flipped']:
             img_orig = img_orig.transpose(Image.FLIP_LEFT_RIGHT)
 
+        img_data['scale'] = 1.
         # create overlaps
         num_objs = len(img_data['classes'])
         overlaps = np.zeros((num_objs, self.num_classes), dtype=np.float32)
@@ -146,11 +147,15 @@ class IMDB(Dataset):
             data['flipped'] = True
         return new
 
-    def evaluate(self, boxes: List[np.array]) -> float:
+    def evaluate(self, bbox_pred: List[np.array], cls_prob: List[np.array], **kwargs) -> float:
         # Evaluate calculated boxes using some kind of metric
-        return self.calculate_mAP(boxes)
+        dets = []
+        for img_bbox_pred, img_cls_prob in zip(bbox_pred, cls_prob):
+            img_cls_prob = np.array([max(enumerate(list(prob)), key=lambda x: x[1])[0] for prob in img_cls_prob])
+            dets.append(np.concatenate([img_bbox_pred, np.expand_dims(img_cls_prob, 1)], axis=1))
+        return self.calculate_mAP(dets)
 
-    def calculateAP(self, boxes: List[np.array], cls: int, ovthresh: float = 0.5) -> float:
+    def calculatePR(self, dets: List[np.array], cls: int, ovthresh: float = 0.5):
         # extract gt objects for this class
         gt_boxes = []
         npos = 0
@@ -158,35 +163,36 @@ class IMDB(Dataset):
             img_boxes = [x[1] for x in zip(img_data['classes'], img_data['boxes']) if x[0] == cls]
             gt_boxes.append({'boxes': np.array(img_boxes),
                              'detected': [False] * len(img_boxes)})
-
-        # read dets
+            npos += len(img_boxes)
 
         # flatten_boxes
         img_idxs = []
-        boxes = []
-        for img_idx, img_boxes in enumerate(boxes):
+        flat_boxes = []
+        for img_idx, img_boxes in enumerate(dets):
             for box in img_boxes:
                 if box[-1] == cls:
                     img_idxs.append(img_idx)
-                    boxes.append(box)
+                    flat_boxes.append(box)
 
         # sort by confidence
-        img_idxs, boxes = zip(*sorted(zip(img_idxs, boxes), key=lambda x: x[1][-1]))
+        if flat_boxes:
+            img_idxs, flat_boxes = zip(*sorted(zip(img_idxs, flat_boxes), key=lambda x: x[1][-1]))
+        else:
+            img_idxs, flat_boxes = [], []
 
-        boxes = np.array(boxes)
+        flat_boxes = np.array(flat_boxes)
 
-        nd = len(boxes)
+        nd = len(flat_boxes)
         tp = np.zeros(nd)
         fp = np.zeros(nd)
 
         # go down dets and mark TPs and FPs
-        for idx, (img_idx, box) in enumerate(zip(img_idxs, boxes)):
+        for idx, (img_idx, box) in enumerate(zip(img_idxs, flat_boxes)):
             ovmax = -np.inf
-            img_data = self._img_data[img_idx]
-            # TODO: create gtbb array first beforhand
+
             gt = gt_boxes[img_idx]['boxes']
 
-            if gt:
+            if gt.size:
                 ixmin = np.maximum(gt[:, 0], box[0])
                 iymin = np.maximum(gt[:, 1], box[1])
                 ixmax = np.minimum(gt[:, 2], box[2])
@@ -206,7 +212,7 @@ class IMDB(Dataset):
 
             if ovmax > ovthresh and not gt_boxes[img_idx]['det']:
                 tp[idx] = 1.
-                gt_boxes[img_idx]['det'] = True
+                gt_boxes[img_idx]['detected'][jmax] = True
             else:
                 fp[idx] = 1.
 
@@ -218,6 +224,10 @@ class IMDB(Dataset):
         # ground truth
         prec = tp / np.maximum(tp + fp, np.finfo(np.float64).eps)
 
+        return prec, rec
+
+    def calculateAP(self, dets: List[np.array], cls: int) -> float:
+        prec, rec = self.calculatePR(dets, cls)
         # correct AP calcuation
         # first append sentinel values at the end
         mrec = np.concatenate([[0.], rec, [1.0]])
@@ -234,24 +244,41 @@ class IMDB(Dataset):
         # sum(\Delta recall) * prec
         ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
 
-        return ap
+        return float(ap)
 
-    def calculate_mAP(self, boxes):
+    def calculate_mAP(self, dets: List[np.array]) -> float:
         aps = []
         for idx, cls in enumerate(self.classes):
-            if cls == 'background':
+            if cls == '__background__':
                 continue
-            ap = self.calculateAP(boxes, cls)
+            ap = self.calculateAP(dets, idx)
             aps.append(ap)
-            print(f"AP for {cls} = {ap:.4f}")
+
         mAP = np.mean(aps)
-        print(f"Mean AP = {mAP:.4f}")
-        return mAP
+        return float(mAP)
 
 
-class CombinedDataset(ConcatDataset):
+class CombinedDataset(IMDB):
     def __init__(self, datasets: List[IMDB]):
-        super().__init__(datasets)
+        assert len(datasets) > 0, 'Datasets should not be an empty iterable'
+        self.datasets = datasets
+        super().__init__("CombinedDataset",
+                         '+'.join([d.name + '_' + d.img_set for d in datasets]),
+                         datasets[0].classes[1:])
+
         dclasses = [x.classes for x in datasets]
         assert dclasses.count(dclasses[0]) == len(dclasses), "Datasets have different classes!"
-        self.num_classes = datasets[0].num_classes
+
+    def _create_img_data(self):
+        img_data = []
+        for dataset in self.datasets:
+            for idx in dataset._index_map:
+                img_data.append(dataset._img_data[idx])
+        return img_data
+
+    def _create_img_index(self):
+        img_idxs = []
+        for dataset in self.datasets:
+            for idx in dataset._index_map:
+                img_idxs.append(dataset.img_index[idx])
+        return img_idxs

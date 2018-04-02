@@ -1,6 +1,9 @@
 .idea/*
+# User specific files
 data
 cache/*
+output/*
+
 
 # Compiled files
 *.o

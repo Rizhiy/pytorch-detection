@@ -74,7 +74,7 @@ class FasterRCNN(nn.Module):
 
         if self.training:
             # Classification Loss
-            cls_loss = F.cross_entropy(cls_pred, rois_label)
+            cls_loss = F.cross_entropy(cls_pred, rois_label, ignore_index=-1)
             # Regression Loss
             box_loss = smooth_l1_loss(box_pred, rois_target, rois_inside_ws, rois_outside_ws)
         # Map back to original images

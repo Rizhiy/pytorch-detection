@@ -12,7 +12,8 @@ class PASCAL_VOC(IMDB):
                    'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor']
 
     def __init__(self, img_set: str, base_path: Path, year=2007, augment=False):
-        super().__init__("pascal_voc", img_set, self.obj_classes, base_path / f"VOC{year}", augment)
+        self._base_path = base_path / f"VOC{year}"
+        super().__init__("pascal_voc", img_set, self.obj_classes, augment)
         self.year = year
 
     def _create_img_index(self):
