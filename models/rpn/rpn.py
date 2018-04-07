@@ -12,7 +12,6 @@ from .proposal_layer import ProposalLayer
 
 
 class RPN(nn.Module):
-
     def __init__(self, filters_in: int, feat_stride: int):
         super().__init__()
         self.filters_in = filters_in
@@ -26,11 +25,11 @@ class RPN(nn.Module):
 
         # Cls score for each anchor
         self.num_scores_out = self._num_anchors * 2  # Class agnostic for now
-        self.cls_conv = nn.Conv2d(cfg.NETWORK.RPN.FILTERS, self.num_scores_out, 1, padding=1)
+        self.cls_conv = nn.Conv2d(cfg.NETWORK.RPN.FILTERS, self.num_scores_out, 1)
 
         # BBox offsets for each anchor
         self.num_bbox_out = self._num_anchors * 4
-        self.bbox_conv = nn.Conv2d(cfg.NETWORK.RPN.FILTERS, self.num_bbox_out, 1, padding=1)
+        self.bbox_conv = nn.Conv2d(cfg.NETWORK.RPN.FILTERS, self.num_bbox_out, 1)
 
         self.proposal_layer = ProposalLayer(feat_stride, cfg.NETWORK.RPN.ANCHOR_SCALES, cfg.NETWORK.RPN.ANCHOR_RATIOS)
         self.anchor_target_layer = AnchorTargetLayer(feat_stride, cfg.NETWORK.RPN.ANCHOR_SCALES,
@@ -60,6 +59,7 @@ class RPN(nn.Module):
         box_loss = 0.
 
         if self.training:
+            # TODO: Try calculating loss directly from rois
             labels, rpn_bbox_targets, rpn_bbox_inside_weights, rpn_bbox_outside_weights = self.anchor_target_layer(
                 cls_score.data, img_info, gt_boxes)
 
@@ -72,7 +72,6 @@ class RPN(nn.Module):
             rpn_label = torch.index_select(rpn_label.view(-1), 0, rpn_keep.data)
             rpn_label = Variable(rpn_label.long())
             cls_loss = F.cross_entropy(rpn_cls_score, rpn_label, ignore_index=-1)
-            fg_cnt = torch.sum(rpn_label.data.ne(0))
 
             # compute bbox regression loss
             rpn_bbox_inside_weights = Variable(rpn_bbox_inside_weights)

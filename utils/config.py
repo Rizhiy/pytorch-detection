@@ -37,6 +37,11 @@ cfg.NETWORK.MIN_SIZE = cfg.NETWORK.RPN.ANCHOR_SCALES[0] * (16 + 1)
 cfg.NETWORK.POOLING_SIZE = 7
 # Whether bbox prediction is class agnostic
 cfg.NETWORK.CLASS_AGNOSTIC = True
+# Normalize the targets using "precomputed" (or made up) means and stdevs
+cfg.NETWORK.TARGETS_NORMALISE = edict()
+cfg.NETWORK.TARGETS_NORMALISE.PRECOMPUTED = True
+cfg.NETWORK.TARGETS_NORMALISE.MEANS = (0.0, 0.0, 0.0, 0.0)
+cfg.NETWORK.TARGETS_NORMALISE.STDS = (0.1, 0.1, 0.2, 0.2)
 
 cfg.DATASET = edict()
 cfg.DATASET.NAME = ''
@@ -44,9 +49,12 @@ cfg.DATASET.CACHE_FOLDER = 'cache'
 cfg.DATASET.IMG_CHANNELS = 3
 cfg.DATASET.TRAIN_SETS = ['train']
 # TODO: Maybe allow testing on multiple sets
+cfg.DATASET.VAL_SET = 'val'
 cfg.DATASET.TEST_SET = 'test'
-cfg.DATASET.BASE_PATH = None
 cfg.DATASET.AUGMENT_TRAIN = True
+cfg.DATASET.SORT = True
+# Key-word arguments specific to each dataset, must be a one level dict
+cfg.DATASET.KWARGS = edict()
 
 cfg.TRAIN = edict()
 
@@ -58,6 +66,9 @@ cfg.TRAIN.EPOCHS = 1
 cfg.TRAIN.LEARNING_RATE = 0.01
 cfg.TRAIN.MOMENTUM = 0.9
 cfg.TRAIN.WEIGHT_DECAY = 0.0005
+# LR Scheduler parameters
+cfg.TRAIN.STEPS = [5, ]
+cfg.TRAIN.GAMMA = 0.1
 # Whether to flip images
 cfg.TRAIN.FLIP = True
 # Images will be scaled to fill the area
@@ -65,9 +76,9 @@ cfg.TRAIN.MAX_AREA = 600_000
 # Images per GPU
 cfg.TRAIN.BATCH_IMAGES = 2
 # Range of scales to train on, remember that images will be rescaled down to fit in memory
-cfg.TRAIN.RESIZE_SCALES = (0.5, 2.)
+cfg.TRAIN.RESIZE_SCALES = (.5, 2.)
 # Minimum relative size to crop
-cfg.TRAIN.CROP_MIN_SCALE = 0.8
+cfg.TRAIN.CROP_MIN_SCALE = 0.5
 # Minibatch size (number of regions of interest [ROIs] to backprop) per image
 cfg.TRAIN.BATCH_SIZE = 128
 # Fraction of minibatch that is labeled foreground (i.e. class > 0)
@@ -97,12 +108,7 @@ cfg.TRAIN.RPN.POSITIVE_WEIGHT = -1
 
 # Proposal Target Layer Params
 cfg.TRAIN.BBOX = edict()
-# Normalize the targets (subtract empirical mean, divide by empirical stddev)
-cfg.TRAIN.BBOX.NORMALIZE_TARGETS = True
-# Normalize the targets using "precomputed" (or made up) means and stdevs
-cfg.TRAIN.BBOX.NORMALIZE_TARGETS_PRECOMPUTED = True
-cfg.TRAIN.BBOX.NORMALIZE_MEANS = (0.0, 0.0, 0.0, 0.0)
-cfg.TRAIN.BBOX.NORMALIZE_STDS = (0.1, 0.1, 0.2, 0.2)
+# TODO: Remove this
 # Deprecated (inside weights)
 cfg.TRAIN.BBOX.INSIDE_WEIGHTS = (1.0, 1.0, 1.0, 1.0)
 
@@ -110,7 +116,9 @@ cfg.TEST = edict()
 
 cfg.TEST.EPOCH = cfg.TRAIN.EPOCHS
 
-cfg.TEST.INPUT_SIZE = 600
+# cfg.TEST.RESIZE_SCALE = 1.
+cfg.TEST.MAX_AREA = 1_200_000  # Can be about double of TEST.MAX_AREA, since we don't store gradients during test
+# TODO: Add default input size option to allow testing similar to competitions
 
 cfg.TEST.RPN = edict()
 # NMS
@@ -152,7 +160,10 @@ def update_config(config_path: Path):
                     elif name == 'DATASET.BASE_PATH':
                         value = Path(value)
                     default_dict[key] = value
+            elif prefix[-1] == 'KWARGS':
+                default_dict[key] = value
             else:
+                print(prefix)
                 raise KeyError(f"key ({key}) must exist in config.py")
 
     with config_path.open() as config:

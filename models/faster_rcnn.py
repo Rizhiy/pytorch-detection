@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
+from models.rpn.utils import clip_boxes, bbox_transform_inv
 from utils.config import cfg
 from utils.net_utils import smooth_l1_loss
 from .feature_extractors import FeatureExtractor
@@ -79,7 +80,18 @@ class FasterRCNN(nn.Module):
             box_loss = smooth_l1_loss(box_pred, rois_target, rois_inside_ws, rois_outside_ws)
         # Map back to original images
         cls_prob = cls_prob.view(batch_size, rois.size(1), -1)
-        box_pred = box_pred.view(batch_size, rois.size(1), -1)
+        box_pred = box_pred.view(batch_size, rois.size(1), -1).data
+
+        # Transform boxes to image boxes
+        # Undo targets normalisation
+        if cfg.NETWORK.TARGETS_NORMALISE.PRECOMPUTED:
+            # Optionally normalize targets by a precomputed mean and stdev
+            box_pred = box_pred * torch.FloatTensor(cfg.NETWORK.TARGETS_NORMALISE.STDS).expand_as(box_pred).cuda() \
+                       + torch.FloatTensor(cfg.NETWORK.TARGETS_NORMALISE.MEANS).expand_as(box_pred).cuda()
+
+        box_pred = bbox_transform_inv(rois[:, :, 1:5].data, box_pred)
+        box_pred = Variable(clip_boxes(box_pred, img_info, img_info.size(0)))
+        # TODO: Return actual boxes
 
         return cls_prob, box_pred, (cls_loss, box_loss, *rpn_losses)
 

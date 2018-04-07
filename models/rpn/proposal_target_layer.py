@@ -25,8 +25,8 @@ class ProposalTargetLayer(nn.Module):
     def __init__(self, nclasses):
         super().__init__()
         self._num_classes = nclasses
-        self.BBOX_NORMALIZE_MEANS = torch.FloatTensor(cfg.TRAIN.BBOX.NORMALIZE_MEANS)
-        self.BBOX_NORMALIZE_STDS = torch.FloatTensor(cfg.TRAIN.BBOX.NORMALIZE_STDS)
+        self.BBOX_NORMALIZE_MEANS = torch.FloatTensor(cfg.NETWORK.TARGETS_NORMALISE.MEANS)
+        self.BBOX_NORMALIZE_STDS = torch.FloatTensor(cfg.NETWORK.TARGETS_NORMALISE.STDS)
         self.BBOX_INSIDE_WEIGHTS = torch.FloatTensor(cfg.TRAIN.BBOX.INSIDE_WEIGHTS)
 
     def forward(self, all_rois, gt_boxes):
@@ -53,14 +53,6 @@ class ProposalTargetLayer(nn.Module):
 
         return rois, labels, bbox_targets, bbox_inside_weights, bbox_outside_weights
 
-    def backward(self, top, propagate_down, bottom):
-        """This layer does not propagate gradients."""
-        pass
-
-    def reshape(self, bottom, top):
-        """Reshaping happens during the call to forward."""
-        pass
-
     def _get_bbox_regression_labels_pytorch(self, bbox_target_data, labels_batch, num_classes):
         """Bounding-box regression targets (bbox_target_data) are stored in a
         compact form b x N x (class, tx, ty, tw, th)
@@ -83,27 +75,25 @@ class ProposalTargetLayer(nn.Module):
             if clss[b].sum() == 0:
                 continue
             inds = torch.nonzero(clss[b] > 0).view(-1)
-            for i in range(inds.numel()):
-                ind = inds[i]
+            for ind in inds:
                 bbox_targets[b, ind, :] = bbox_target_data[b, ind, :]
                 bbox_inside_weights[b, ind, :] = self.BBOX_INSIDE_WEIGHTS
 
         return bbox_targets, bbox_inside_weights
 
-    def _compute_targets_pytorch(self, ex_rois, gt_rois):
+    def _compute_targets_pytorch(self, pred_rois, gt_rois):
         """Compute bounding-box regression targets for an image."""
 
-        assert ex_rois.size(1) == gt_rois.size(1)
-        assert ex_rois.size(2) == 4
+        assert pred_rois.size(1) == gt_rois.size(1)
+        assert pred_rois.size(2) == 4
         assert gt_rois.size(2) == 4
 
-        batch_size = ex_rois.size(0)
-        rois_per_image = ex_rois.size(1)
+        batch_size = pred_rois.size(0)
+        rois_per_image = pred_rois.size(1)
 
-        targets = bbox_transform_batch(ex_rois, gt_rois)
+        targets = bbox_transform_batch(pred_rois, gt_rois)
 
-        if cfg.TRAIN.BBOX.NORMALIZE_TARGETS_PRECOMPUTED:
-            # Optionally normalize targets by a precomputed mean and stdev
+        if cfg.NETWORK.TARGETS_NORMALISE.PRECOMPUTED:
             targets = ((targets - self.BBOX_NORMALIZE_MEANS.expand_as(targets))
                        / self.BBOX_NORMALIZE_STDS.expand_as(targets))
 
@@ -126,14 +116,12 @@ class ProposalTargetLayer(nn.Module):
         offset = torch.arange(0, batch_size) * gt_boxes.size(1)
         offset = offset.view(-1, 1).type_as(gt_assignment) + gt_assignment
 
-        labels = gt_boxes[:, :, 4].contiguous().view(-1).index(offset.view(-1)) \
-            .view(batch_size, -1)
+        labels = gt_boxes[:, :, 4].contiguous().view(-1).index(offset.view(-1)).view(batch_size, -1)
 
         labels_batch = labels.new(batch_size, rois_per_image).zero_()
         rois_batch = all_rois.new(batch_size, rois_per_image, 5).zero_()
         gt_rois_batch = all_rois.new(batch_size, rois_per_image, 5).zero_()
-        # Guard against the case when an image has fewer than max_fg_rois_per_image
-        # foreground RoIs
+        # Guard against the case when an image has fewer than max_fg_rois_per_image foreground RoIs
         for i in range(batch_size):
 
             fg_inds = torch.nonzero(max_overlaps[i] >= cfg.TRAIN.FG_THRESH).view(-1)

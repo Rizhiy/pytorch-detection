@@ -15,7 +15,7 @@ from torch import nn
 
 from utils.config import cfg
 from utils.nms import nms
-from .utils import generate_anchors, clip_boxes
+from .utils import generate_anchors, clip_boxes, bbox_transform_inv
 
 
 class ProposalLayer(nn.Module):
@@ -49,6 +49,7 @@ class ProposalLayer(nn.Module):
         # the first set of _num_anchors channels are bg probs
         # the second set are the fg probs
         scores = scores[:, self._num_anchors:, :, :]
+
         cfg_key = 'TRAIN' if self.training else 'TEST'
 
         pre_nms_topN = cfg[cfg_key].RPN.NMS.PRE_TOP_N
@@ -61,6 +62,7 @@ class ProposalLayer(nn.Module):
         shift_x = np.arange(0, feat_width) * self._feat_stride
         shift_y = np.arange(0, feat_height) * self._feat_stride
         shift_x, shift_y = np.meshgrid(shift_x, shift_y)
+
         shifts = torch.from_numpy(np.vstack((shift_x.ravel(), shift_y.ravel(),
                                              shift_x.ravel(), shift_y.ravel())).transpose())
         shifts = shifts.contiguous().type_as(scores).float()
@@ -84,7 +86,7 @@ class ProposalLayer(nn.Module):
         scores = scores.view(batch_size, -1)
 
         # Convert anchors into proposals via bbox transformations
-        proposals = self.bbox_transform_inv(anchors, bbox_deltas)
+        proposals = bbox_transform_inv(anchors, bbox_deltas)
 
         # 2. clip predicted boxes to image
         proposals = clip_boxes(proposals, img_info, batch_size)
@@ -113,48 +115,21 @@ class ProposalLayer(nn.Module):
             scores_single = scores_single[order_single].view(-1, 1)
 
             # 6. apply nms (e.g. threshold = 0.7)
+            keep_idx_i = nms(torch.cat((proposals_single, scores_single), 1), nms_thresh)
             # 7. take after_nms_topN (e.g. 300)
             # 8. return the top proposals (-> RoIs top)
 
-            keep_idx_i = nms(torch.cat((proposals_single, scores_single), 1), nms_thresh)
+
             keep_idx_i = keep_idx_i.long().view(-1)
 
-            if post_nms_topN > 0:
+            if post_nms_topN > 0 and post_nms_topN < keep_idx_i.numel():
                 keep_idx_i = keep_idx_i[:post_nms_topN]
             proposals_single = proposals_single[keep_idx_i, :]
 
             # padding 0 at the end.
             num_proposal = proposals_single.size(0)
+            # TODO: find out the purpose of line below and comment it
             output[i, :, 0] = i
             output[i, :num_proposal, 1:] = proposals_single
 
         return output
-
-    @staticmethod
-    def bbox_transform_inv(boxes, deltas):
-        widths = boxes[:, :, 2] - boxes[:, :, 0] + 1.0
-        heights = boxes[:, :, 3] - boxes[:, :, 1] + 1.0
-        ctr_x = boxes[:, :, 0] + 0.5 * widths
-        ctr_y = boxes[:, :, 1] + 0.5 * heights
-
-        dx = deltas[:, :, 0::4]
-        dy = deltas[:, :, 1::4]
-        dw = deltas[:, :, 2::4]
-        dh = deltas[:, :, 3::4]
-
-        pred_ctr_x = dx * widths.unsqueeze(2) + ctr_x.unsqueeze(2)
-        pred_ctr_y = dy * heights.unsqueeze(2) + ctr_y.unsqueeze(2)
-        pred_w = torch.exp(dw) * widths.unsqueeze(2)
-        pred_h = torch.exp(dh) * heights.unsqueeze(2)
-
-        pred_boxes = deltas.clone()
-        # x1
-        pred_boxes[:, :, 0::4] = pred_ctr_x - 0.5 * pred_w
-        # y1
-        pred_boxes[:, :, 1::4] = pred_ctr_y - 0.5 * pred_h
-        # x2
-        pred_boxes[:, :, 2::4] = pred_ctr_x + 0.5 * pred_w
-        # y2
-        pred_boxes[:, :, 3::4] = pred_ctr_y + 0.5 * pred_h
-
-        return pred_boxes

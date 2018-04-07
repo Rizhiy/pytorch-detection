@@ -11,9 +11,9 @@ class PASCAL_VOC(IMDB):
     obj_classes = ['aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable',
                    'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor']
 
-    def __init__(self, img_set: str, base_path: Path, year=2007, augment=False):
-        self._base_path = base_path / f"VOC{year}"
-        super().__init__("pascal_voc", img_set, self.obj_classes, augment)
+    def __init__(self, img_set: str, base_path: str, year: int, **kwargs):
+        self._base_path = Path(base_path) / f"VOC{year}"
+        super().__init__("pascal_voc", img_set, self.obj_classes, **kwargs)
         self.year = year
 
     def _create_img_index(self):
@@ -48,7 +48,7 @@ class PASCAL_VOC(IMDB):
                 y2 = float(bbox.find('ymax').text) - 1
 
                 diffc = obj.find('difficult')
-                difficult = 0 if diffc == None else int(diffc.text)
+                difficult = 0 if diffc is None else int(diffc.text)
                 ishards[ix] = difficult
 
                 class_to_idx = dict(zip(self.classes, range(self.num_classes)))

@@ -12,8 +12,7 @@ from utils.config import cfg
 
 
 class IMDB(Dataset):
-    def __init__(self, name: str, img_set: str, classes: List[str], augment=False):
-        # TODO: add argument for sorting by aspect ratio
+    def __init__(self, name: str, img_set: str, classes: List[str], augment=False, sort=True):
         """
         Base Image Database class
         :param name: name of the dataset
@@ -39,46 +38,59 @@ class IMDB(Dataset):
             with self._cache_path.open('wb') as cache_file:
                 pickle.dump(self._img_data, cache_file)
             print(f"Saved {self.name} cache to {self._cache_path}")
-        self._index_map = self._create_sorted_index()
+        if sort:
+            self._index_map = self._create_sorted_index()
+        else:
+            self._index_map = range(len(self.img_index))
 
     @property
     def num_classes(self) -> int:
         return len(self.classes)
 
     @staticmethod
-    def augmentation(img: Image, img_data: dict) -> Tuple[Image.Image, dict]:
+    def check_min_size(shape: Tuple[int, int]) -> Tuple[Tuple[int, int], np.ndarray]:
+        min_scale = min([x / cfg.NETWORK.MIN_SIZE for x in shape])
+        resize_scale = np.array([1.])
+        if min_scale < 1:
+            resize_scale /= min_scale
+            shape = tuple((shape * resize_scale).astype(int))
+        return shape, resize_scale
+
+    @staticmethod
+    def augmentation(orig_img: Image, img_data: dict) -> Tuple[Image.Image, dict]:
         # TODO: This augmentation is a bit suboptimal, need to improve it
-        shape = img_data['shape']
+        # TODO: separate resize into it's own method since we need it for test as well
+        # TODO: Bring flip here and separate different augmentations into separate methods
+        orig_shape = img_data['shape']
         crop_scale = np.random.uniform(low=cfg.TRAIN.CROP_MIN_SCALE)
         resize_scale = np.random.uniform(*cfg.TRAIN.RESIZE_SCALES)
 
         # First crop the image a bit
-        w, h = shape
-        tw, th = tuple((shape * crop_scale).astype(int))
+        # Keep aspect ratio during crop for easier collation
+        w, h = orig_shape
+        tw, th = tuple((orig_shape * crop_scale).astype(int))
         x = np.random.randint(0, w - tw)
         y = np.random.randint(0, h - th)
 
-        img = img.crop((x, y, x + tw, y + th))
+        img = orig_img.crop((x, y, x + tw, y + th))
         shape = np.array((tw, th))
 
         # Then Scale
         target_shape = tuple((shape * resize_scale).astype(int))
+
         # Check if image will be large enough
-        min_scale = min([x / cfg.NETWORK.MIN_SIZE for x in target_shape])
-        if min_scale < 1:
-            resize_scale /= min_scale
-            target_shape = tuple((shape * resize_scale).astype(int))
+        target_shape, additional_scale = IMDB.check_min_size(target_shape)
+        resize_scale *= additional_scale
         # TODO: check if this resizes correctly (no squeeze)
         img = img.resize(target_shape)
 
-        # TODO: Check that all boxes are inside the crop/delete ones outside
-        # Update boxes
-        new_boxes = np.clip(img_data['boxes'] - [x, y, x, y], 0, np.inf) * resize_scale
+        # TODO: Perhaps delete boxes that are too small after resize
+        # Move, clip (for crop) and resize boxes
+        new_boxes = np.clip(img_data['boxes'] - [x, y, x, y], 0, [tw, th, tw, th]) * resize_scale
 
         img_data.update({"scale": resize_scale,
                          "shape": target_shape,
                          "boxes": new_boxes})
-
         return img, img_data
 
     def __len__(self):
@@ -112,7 +124,14 @@ class IMDB(Dataset):
         if self.augment:
             img, img_data = self.augmentation(img_orig, img_data)
         else:
-            img, img_data = img_orig, img_data
+            img = img_orig
+            target_shape, resize_scale = IMDB.check_min_size(img_data['shape'])
+            if (target_shape != img_data['shape']).any():
+                # TODO: check if this resizes correctly (no stretch)
+                img = img.resize(target_shape)
+                img_data.update({'shape': target_shape,
+                                 'scale': resize_scale})
+
         return img, img_data
 
     def _create_sorted_index(self):
@@ -142,24 +161,40 @@ class IMDB(Dataset):
 
     def create_flipped(self) -> 'IMDB':
         new = deepcopy(self)
+        new.img_set += '_flipped'
         for idx, data in enumerate(new._img_data):
             data['boxes'][:, [2, 0]] = data['shape'][0] - data['boxes'][:, [0, 2]]
             data['flipped'] = True
         return new
 
-    def evaluate(self, bbox_pred: List[np.array], cls_prob: List[np.array], **kwargs) -> float:
+    def evaluate(self, bbox_pred: List[np.array], cls_prob: List[np.array], debug=False, **kwargs) -> float:
+        """
+
+        :param bbox_pred: each ndarray must have the following columns: x1, y1, x2, y2
+        :param cls_prob: should be probabilities for each class including __background__
+        :param debug: whether to print additional information
+        :return:
+        """
         # Evaluate calculated boxes using some kind of metric
         dets = []
         for img_bbox_pred, img_cls_prob in zip(bbox_pred, cls_prob):
-            img_cls_prob = np.array([max(enumerate(list(prob)), key=lambda x: x[1])[0] for prob in img_cls_prob])
-            dets.append(np.concatenate([img_bbox_pred, np.expand_dims(img_cls_prob, 1)], axis=1))
-        return self.calculate_mAP(dets)
+            img_cls = np.array([max(enumerate(list(prob)), key=lambda x: x[1]) for prob in img_cls_prob])
+            dets.append(np.concatenate([img_bbox_pred, img_cls], axis=1))
+        return self.calculate_mAP(dets, debug)
 
-    def calculatePR(self, dets: List[np.array], cls: int, ovthresh: float = 0.5):
+    def calculatePR(self, dets: List[np.ndarray], cls: int, ovthresh: float = 0.5):
+        """
+        Calculate precision/recall curve for one class
+        :param dets: Each ndarray, must have the following columns: x1, y1, x2, y2, cls, prob
+        :param cls: class to test
+        :param ovthresh: overlap threshold for positive
+        :return:
+        """
         # extract gt objects for this class
         gt_boxes = []
         npos = 0
-        for img_data in self._img_data:
+        for true_idx in self._index_map:
+            img_data = self._img_data[true_idx]
             img_boxes = [x[1] for x in zip(img_data['classes'], img_data['boxes']) if x[0] == cls]
             gt_boxes.append({'boxes': np.array(img_boxes),
                              'detected': [False] * len(img_boxes)})
@@ -170,13 +205,13 @@ class IMDB(Dataset):
         flat_boxes = []
         for img_idx, img_boxes in enumerate(dets):
             for box in img_boxes:
-                if box[-1] == cls:
+                if box[-2] == cls:
                     img_idxs.append(img_idx)
                     flat_boxes.append(box)
 
         # sort by confidence
         if flat_boxes:
-            img_idxs, flat_boxes = zip(*sorted(zip(img_idxs, flat_boxes), key=lambda x: x[1][-1]))
+            img_idxs, flat_boxes = zip(*sorted(zip(img_idxs, flat_boxes), key=lambda x: x[1][-1], reverse=True))
         else:
             img_idxs, flat_boxes = [], []
 
@@ -189,9 +224,7 @@ class IMDB(Dataset):
         # go down dets and mark TPs and FPs
         for idx, (img_idx, box) in enumerate(zip(img_idxs, flat_boxes)):
             ovmax = -np.inf
-
             gt = gt_boxes[img_idx]['boxes']
-
             if gt.size:
                 ixmin = np.maximum(gt[:, 0], box[0])
                 iymin = np.maximum(gt[:, 1], box[1])
@@ -210,7 +243,7 @@ class IMDB(Dataset):
                 ovmax = np.max(overlaps)
                 jmax = np.argmax(overlaps)
 
-            if ovmax > ovthresh and not gt_boxes[img_idx]['det']:
+            if ovmax > ovthresh and not gt_boxes[img_idx]['detected'][jmax]:
                 tp[idx] = 1.
                 gt_boxes[img_idx]['detected'][jmax] = True
             else:
@@ -228,7 +261,7 @@ class IMDB(Dataset):
 
     def calculateAP(self, dets: List[np.array], cls: int) -> float:
         prec, rec = self.calculatePR(dets, cls)
-        # correct AP calcuation
+        # correct AP calculation
         # first append sentinel values at the end
         mrec = np.concatenate([[0.], rec, [1.0]])
         mpre = np.concatenate([[0.], prec, [0.0]])
@@ -246,25 +279,33 @@ class IMDB(Dataset):
 
         return float(ap)
 
-    def calculate_mAP(self, dets: List[np.array]) -> float:
+    def calculate_mAP(self, dets: List[np.ndarray], debug=False) -> float:
+        """
+        :param dets: Each ndarray must have t he following format: x1, y1, x2, y2, cls, prob
+        :param debug: whether to print additional information
+        :return: mean average precision score
+        """
         aps = []
         for idx, cls in enumerate(self.classes):
             if cls == '__background__':
                 continue
             ap = self.calculateAP(dets, idx)
             aps.append(ap)
-
-        mAP = np.mean(aps)
-        return float(mAP)
+            if debug:
+                print(f"AP for {cls:>13s}: {ap:.3f}")
+        mAP = float(np.mean(aps))
+        if debug:
+            print(f"{'mAP':>20s}: {mAP:.3f}")
+        return mAP
 
 
 class CombinedDataset(IMDB):
-    def __init__(self, datasets: List[IMDB]):
+    def __init__(self, datasets: List[IMDB], **kwargs):
         assert len(datasets) > 0, 'Datasets should not be an empty iterable'
         self.datasets = datasets
         super().__init__("CombinedDataset",
                          '+'.join([d.name + '_' + d.img_set for d in datasets]),
-                         datasets[0].classes[1:])
+                         datasets[0].classes[1:], **kwargs)
 
         dclasses = [x.classes for x in datasets]
         assert dclasses.count(dclasses[0]) == len(dclasses), "Datasets have different classes!"

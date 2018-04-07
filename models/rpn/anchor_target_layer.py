@@ -36,7 +36,7 @@ class AnchorTargetLayer(nn.Module):
         # allow boxes to sit over the edge by a small amount
         self._allowed_border = 0  # default is 0
 
-    def forward(self, cls_score, img_info, gt_boxes):
+    def forward(self, cls_score, img_info: torch.FloatTensor, gt_boxes: torch.FloatTensor):
         # Algorithm:
         #
         # for each (H, W) location i
@@ -63,18 +63,21 @@ class AnchorTargetLayer(nn.Module):
         self._anchors = self._anchors.type_as(gt_boxes)  # move to specific gpu.
         all_anchors = self._anchors.view(1, A, 4) + shifts.view(K, 1, 4)
         all_anchors = all_anchors.view(K * A, 4)
+        all_anchors = all_anchors
 
         total_anchors = int(K * A)
 
-        keep = ((all_anchors[:, 0] >= -self._allowed_border) &
-                (all_anchors[:, 1] >= -self._allowed_border) &
-                (all_anchors[:, 2] < int(img_info[0][1]) + self._allowed_border) &
-                (all_anchors[:, 3] < int(img_info[0][0]) + self._allowed_border))
+        # keep only inside anchors, inside of combined (padded) area
+        max_info = torch.max(img_info, 0)[0]
+        keep = (all_anchors[:, 0] >= -self._allowed_border) & \
+               (all_anchors[:, 1] >= -self._allowed_border) & \
+               (all_anchors[:, 2] < int(max_info[0]) + self._allowed_border) & \
+               (all_anchors[:, 3] < int(max_info[1]) + self._allowed_border)
+        inds_inside = torch.nonzero(keep).view(-1)
+        anchors = all_anchors[inds_inside, :]
 
-        inds_inside = torch.nonzero(keep)
+        anchors = anchors.unsqueeze(0).repeat(batch_size, 1, 1)
 
-        # keep only inside anchors
-        anchors = all_anchors[inds_inside, :].squeeze(1)
         # label: 1 is positive, 0 is negative, -1 is dont care
         labels = gt_boxes.new(batch_size, inds_inside.size(0)).fill_(-1)
         bbox_inside_weights = gt_boxes.new(batch_size, inds_inside.size(0)).zero_()
@@ -85,6 +88,7 @@ class AnchorTargetLayer(nn.Module):
         max_overlaps, argmax_overlaps = torch.max(overlaps, 2)
         gt_max_overlaps, _ = torch.max(overlaps, 1)
 
+        # TODO: What does this do?
         if not cfg.TRAIN.RPN.CLOBBER_POSITIVES:
             labels[max_overlaps < cfg.TRAIN.RPN.NEGATIVE_OVERLAP] = 0
 
@@ -131,6 +135,7 @@ class AnchorTargetLayer(nn.Module):
         offset = torch.arange(0, batch_size) * gt_boxes.size(1)
 
         argmax_overlaps = argmax_overlaps + offset.view(batch_size, 1).type_as(argmax_overlaps)
+
         bbox_targets = self._compute_targets_batch(anchors,
                                                    gt_boxes.view(-1, 5)[argmax_overlaps.view(-1), :]
                                                    .view(batch_size, -1, 5))
@@ -176,6 +181,7 @@ class AnchorTargetLayer(nn.Module):
         bbox_outside_weights = bbox_outside_weights.contiguous().view(batch_size, height, width, 4 * A) \
             .permute(0, 3, 1, 2).contiguous()
         outputs.append(bbox_outside_weights)
+
         return labels, bbox_targets, bbox_inside_weights, bbox_outside_weights
 
     @staticmethod
@@ -192,7 +198,7 @@ class AnchorTargetLayer(nn.Module):
         return ret
 
     @staticmethod
-    def _compute_targets_batch(ex_rois, gt_rois):
+    def _compute_targets_batch(anchors, gt_rois):
         """Compute bounding-box regression targets for an image."""
 
-        return bbox_transform_batch(ex_rois, gt_rois[:, :, :4])
+        return bbox_transform_batch(anchors, gt_rois[:, :, :4])

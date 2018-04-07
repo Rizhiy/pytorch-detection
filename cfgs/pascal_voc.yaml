@@ -1,15 +1,26 @@
 NAME: "pascal_voc_box_loss"
 DATASET:
   NAME: PASCAL_VOC
-  BASE_PATH: "data/VOCdevkit"
+  KWARGS:
+    base_path: "data/VOCdevkit"
+    year: 2007
+  AUGMENT_TRAIN: True
+  TRAIN_SETS: ['train', 'val']
+  VAL_SET: 'test'
 
 TRAIN:
   RESIZE_SCALES:
-    - 0.5
-    - 2.0
+    - 1.0
+    - 4.0
   SEED: 42
-  EPOCHS: 7
+  EPOCHS: 14
+  STEPS:
+    - 5
+    - 8
+    - 11
   MAX_AREA: 650_000
+  FLIP: False
+  BG_THRESH_LO: 0.0
 
 TEST:
-  EPOCH: 7
+  EPOCH: 14

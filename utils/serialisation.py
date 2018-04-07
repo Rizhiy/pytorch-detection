@@ -46,3 +46,9 @@ def load_detections() -> dict:
         results = pickle.load(results_file)
     print(f"Loaded detections from {path}")
     return results
+
+
+def delete_detections():
+    path = get_output_folder() / results_filename
+    path.unlink()
+    print("Deleted old detections")
