@@ -117,7 +117,7 @@ cfg.TEST = edict()
 
 cfg.TEST.EPOCH = cfg.TRAIN.EPOCHS
 
-# cfg.TEST.RESIZE_SCALE = 1.
+cfg.TEST.RESIZE_SCALE = 1.
 cfg.TEST.MAX_AREA = 1_200_000  # Can be about double of TEST.MAX_AREA, since we don't store gradients during test
 # TODO: Add default input size option to allow testing similar to competitions
 

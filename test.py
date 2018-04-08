@@ -33,7 +33,9 @@ def test(test_sets: List[str], batch_size=1, workers=4, cached=False, mGPUs=True
     :param mGPUs: whether to use multiple GPUs
     :param net: network to use for test
     """
-    test_imdb = create_dataset(cfg.DATASET.NAME, test_sets, sort=cfg.DATASET.SORT,
+
+    test_transform = DetResize(cfg.TEST.RESIZE_SCALE)
+    test_imdb = create_dataset(cfg.DATASET.NAME, test_sets, sort=cfg.DATASET.SORT, transform=test_transform,
                                **cfg.DATASET.KWARGS)
 
     # TODO: Work on multi-img test
@@ -79,6 +81,8 @@ def test(test_sets: List[str], batch_size=1, workers=4, cached=False, mGPUs=True
                 for img_cls_prob, img_bbox_pred in zip(batch_cls_prob, batch_bbox_pred):
                     img_cls_prob = img_cls_prob.data.cpu().numpy()
                     img_bbox_pred = img_bbox_pred.data.cpu().numpy()
+                    # Adjust boxes back to correct scale
+                    img_bbox_pred = img_bbox_pred / cfg.TEST.RESIZE_SCALE
                     cls_prob.append(img_cls_prob)
                     bbox_pred.append(img_bbox_pred)
                 pbar.update(batch_size)
