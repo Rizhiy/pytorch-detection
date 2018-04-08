@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 
 from dataset import create_dataset
 from dataset.collate import resize_collate
+from dataset.transforms import DetCompose, DetRandomCrop, DetResize
 from models import create_feature_extractor
 from models.faster_rcnn import FasterRCNN
 from test import test
@@ -43,8 +44,16 @@ def train(batch_size: int = 1, workers: int = 4, resume: int = 0, validate=False
     # Add tensorboard for logging
     writer = SummaryWriter(f"runs/{cfg.NAME} {datetime.now().strftime('%m-%d %H:%M')}")
 
+    transforms = []
+    if cfg.TRAIN.CROP:
+        transforms.append(DetRandomCrop(cfg.TRAIN.CROP_MIN_SCALE))
+    if cfg.TRAIN.RESIZE:
+        transforms.append(DetResize(*cfg.TRAIN.RESIZE_SCALES))
+
+    train_transform = DetCompose(transforms)
+
     train_imdb = create_dataset(cfg.DATASET.NAME, cfg.DATASET.TRAIN_SETS,
-                                augment=cfg.DATASET.AUGMENT_TRAIN, sort=cfg.DATASET.SORT, flip=cfg.TRAIN.FLIP,
+                                transform=train_transform, sort=cfg.DATASET.SORT, flip=cfg.TRAIN.FLIP,
                                 **cfg.DATASET.KWARGS)
 
     num_gpus = torch.cuda.device_count()
@@ -93,15 +102,15 @@ def train(batch_size: int = 1, workers: int = 4, resume: int = 0, validate=False
                 input_info = Variable(img_info)
                 input_boxes = Variable(boxes)
 
-                # for img_idx, img in enumerate(tensorToImage(input_imgs.data)):
-                #     draw = ImageDraw.Draw(img)
-                #     boxes = input_boxes[img_idx].data.cpu().numpy()
-                #     for box in boxes:
-                #         box = box.astype(int)
-                #         draw.rectangle(tuple(box[:4]), outline=(0, 255, 0))
-                #     img.save(f"{batch_size*idx+img_idx}.jpg")
-                # if idx > 3:
-                #     exit()
+                for img_idx, img in enumerate(tensorToImage(input_imgs.data)):
+                    draw = ImageDraw.Draw(img)
+                    boxes = input_boxes[img_idx].data.cpu().numpy()
+                    for box in boxes:
+                        box = box.astype(int)
+                        draw.rectangle(tuple(box[:4]), outline=(0, 255, 0))
+                    img.save(f"{batch_size*idx+img_idx}.jpg")
+                if idx > 3:
+                    exit()
 
                 if cfg.CUDA:
                     input_imgs, input_info, input_boxes = input_imgs.cuda(), input_info.cuda(), input_boxes.cuda()

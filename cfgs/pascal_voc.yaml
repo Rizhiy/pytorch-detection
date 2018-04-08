@@ -4,7 +4,6 @@ DATASET:
   KWARGS:
     base_path: "data/VOCdevkit"
     year: 2007
-  AUGMENT_TRAIN: True
   TRAIN_SETS: ['train', 'val']
   VAL_SET: 'test'
 

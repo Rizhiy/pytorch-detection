@@ -17,6 +17,8 @@ from models.faster_rcnn import FasterRCNN
 from utils.config import cfg, update_config
 from utils.serialisation import load_checkpoint, load_detections, save_detections
 
+from dataset.transforms import resize, DetResize
+
 
 # TODO: Add logging
 
@@ -31,7 +33,7 @@ def test(test_sets: List[str], batch_size=1, workers=4, cached=False, mGPUs=True
     :param mGPUs: whether to use multiple GPUs
     :param net: network to use for test
     """
-    test_imdb = create_dataset(cfg.DATASET.NAME, test_sets, augment=False, sort=cfg.DATASET.SORT,
+    test_imdb = create_dataset(cfg.DATASET.NAME, test_sets, sort=cfg.DATASET.SORT,
                                **cfg.DATASET.KWARGS)
 
     # TODO: Work on multi-img test

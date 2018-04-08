@@ -51,7 +51,6 @@ cfg.DATASET.TRAIN_SETS = ['train']
 # TODO: Maybe allow testing on multiple sets
 cfg.DATASET.VAL_SET = 'val'
 cfg.DATASET.TEST_SET = 'test'
-cfg.DATASET.AUGMENT_TRAIN = True
 cfg.DATASET.SORT = True
 # Key-word arguments specific to each dataset, must be a one level dict
 cfg.DATASET.KWARGS = edict()
@@ -69,7 +68,9 @@ cfg.TRAIN.WEIGHT_DECAY = 0.0005
 # LR Scheduler parameters
 cfg.TRAIN.STEPS = [5, ]
 cfg.TRAIN.GAMMA = 0.1
-# Whether to flip images
+# Transforms
+cfg.TRAIN.CROP = True
+cfg.TRAIN.RESIZE = True
 cfg.TRAIN.FLIP = True
 # Images will be scaled to fill the area
 cfg.TRAIN.MAX_AREA = 600_000

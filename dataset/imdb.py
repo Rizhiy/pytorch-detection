@@ -1,18 +1,20 @@
 import pickle
 from copy import deepcopy
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Callable
 
 import numpy as np
 import scipy.sparse
 from PIL import Image
 from torch.utils.data import Dataset
 
+from dataset.transforms import DetRandomCrop, check_min_size, DetResize
 from utils.config import cfg
 
 
+# TODO: Perhaps change img_data into it's own class, maybe @dataclass in python3.7
 class IMDB(Dataset):
-    def __init__(self, name: str, img_set: str, classes: List[str], augment=False, sort=True):
+    def __init__(self, name: str, img_set: str, classes: List[str], sort=True, transform: Callable = None, **kwargs):
         """
         Base Image Database class
         :param name: name of the dataset
@@ -23,9 +25,9 @@ class IMDB(Dataset):
         super().__init__()
         self.name = name
         self.img_set = img_set
-        self.augment = augment
         self.classes = ['__background__', *classes]
         self.img_index = self._create_img_index()
+        self.transform = transform
         self._cache_path = Path(cfg.DATASET.CACHE_FOLDER) / (self.name + '_' + self.img_set + '.pkl')
 
         if self._cache_path.exists():
@@ -47,52 +49,6 @@ class IMDB(Dataset):
     def num_classes(self) -> int:
         return len(self.classes)
 
-    @staticmethod
-    def check_min_size(shape: Tuple[int, int]) -> Tuple[Tuple[int, int], np.ndarray]:
-        min_scale = min([x / cfg.NETWORK.MIN_SIZE for x in shape])
-        resize_scale = np.array([1.])
-        if min_scale < 1:
-            resize_scale /= min_scale
-            shape = tuple((shape * resize_scale).astype(int))
-        return shape, resize_scale
-
-    @staticmethod
-    def augmentation(orig_img: Image, img_data: dict) -> Tuple[Image.Image, dict]:
-        # TODO: This augmentation is a bit suboptimal, need to improve it
-        # TODO: separate resize into it's own method since we need it for test as well
-        # TODO: Bring flip here and separate different augmentations into separate methods
-        orig_shape = img_data['shape']
-        crop_scale = np.random.uniform(low=cfg.TRAIN.CROP_MIN_SCALE)
-        resize_scale = np.random.uniform(*cfg.TRAIN.RESIZE_SCALES)
-
-        # First crop the image a bit
-        # Keep aspect ratio during crop for easier collation
-        w, h = orig_shape
-        tw, th = tuple((orig_shape * crop_scale).astype(int))
-        x = np.random.randint(0, w - tw)
-        y = np.random.randint(0, h - th)
-
-        img = orig_img.crop((x, y, x + tw, y + th))
-        shape = np.array((tw, th))
-
-        # Then Scale
-        target_shape = tuple((shape * resize_scale).astype(int))
-
-        # Check if image will be large enough
-        target_shape, additional_scale = IMDB.check_min_size(target_shape)
-        resize_scale *= additional_scale
-        # TODO: check if this resizes correctly (no squeeze)
-        img = img.resize(target_shape)
-
-        # TODO: Perhaps delete boxes that are too small after resize
-        # Move, clip (for crop) and resize boxes
-        new_boxes = np.clip(img_data['boxes'] - [x, y, x, y], 0, [tw, th, tw, th]) * resize_scale
-
-        img_data.update({"scale": resize_scale,
-                         "shape": target_shape,
-                         "boxes": new_boxes})
-        return img, img_data
-
     def __len__(self):
         return len(self.img_index)
 
@@ -105,11 +61,11 @@ class IMDB(Dataset):
         """
         true_idx = self._index_map[idx]
         img_path = self.img_index[true_idx]
-        img_orig = Image.open(img_path)
+        img = Image.open(img_path)
         img_data = self._img_data[true_idx]
 
         if img_data['flipped']:
-            img_orig = img_orig.transpose(Image.FLIP_LEFT_RIGHT)
+            img = img.transpose(Image.FLIP_LEFT_RIGHT)
 
         img_data['scale'] = 1.
         # create overlaps
@@ -119,18 +75,10 @@ class IMDB(Dataset):
         overlaps = scipy.sparse.csr_matrix(overlaps)
         img_data['overlaps'] = overlaps
 
-        assert (img_orig.size == img_data['shape']).all(), f"Image shape for {img_path} doesn't match stored shape"
+        assert (img.size == img_data['shape']).all(), f"Image shape for {img_path} doesn't match stored shape"
 
-        if self.augment:
-            img, img_data = self.augmentation(img_orig, img_data)
-        else:
-            img = img_orig
-            target_shape, resize_scale = IMDB.check_min_size(img_data['shape'])
-            if (target_shape != img_data['shape']).any():
-                # TODO: check if this resizes correctly (no stretch)
-                img = img.resize(target_shape)
-                img_data.update({'shape': target_shape,
-                                 'scale': resize_scale})
+        if self.transform is not None:
+            img, img_data = self.transform(img, img_data)
 
         return img, img_data
 
