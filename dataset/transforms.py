@@ -1,9 +1,14 @@
-from typing import Tuple, Callable, List
+from typing import Tuple, List
 
 import numpy as np
 from PIL.Image import Image
 
 from utils import cfg
+
+
+class DetTransform:
+    def __call__(self, img: Image, img_data: dict) -> Tuple[Image, dict]:
+        raise NotImplementedError
 
 
 def check_min_size(shape: Tuple[int, int]) -> np.ndarray:
@@ -20,7 +25,7 @@ def check_min_size(shape: Tuple[int, int]) -> np.ndarray:
 
 
 # TODO: Perhaps replace these transformations with functions
-class DetRandomCrop:
+class DetRandomCrop(DetTransform):
     def __init__(self, min_scale: float):
         self.min_scale = min_scale
 
@@ -52,7 +57,7 @@ def resize(img: Image, img_data: dict, scale: np.ndarray) -> Tuple[Image, dict]:
     return img, img_data
 
 
-class DetResize:
+class DetResize(DetTransform):
     def __init__(self, low: float, high: float = None):
         """
         Resize img and bounding boxes
@@ -77,8 +82,8 @@ class DetResize:
         return resize(orig_img, img_data, scale)
 
 
-class DetCompose:
-    def __init__(self, transforms: List[Callable]):
+class DetCompose(DetTransform):
+    def __init__(self, transforms: List[DetTransform]):
         self.transforms = transforms
 
     def __call__(self, img: Image, img_data: dict) -> Tuple[Image, dict]:

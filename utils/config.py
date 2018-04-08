@@ -77,6 +77,7 @@ cfg.TRAIN.MAX_AREA = 600_000
 # Images per GPU
 cfg.TRAIN.BATCH_IMAGES = 2
 # Range of scales to train on, remember that images will be rescaled down to fit in memory
+# This range should ideally be geometrically centred at the TEST.RESIZE_SCALE
 cfg.TRAIN.RESIZE_SCALES = (.5, 2.)
 # Minimum relative size to crop
 cfg.TRAIN.CROP_MIN_SCALE = 0.5

@@ -1,20 +1,21 @@
 import pickle
 from copy import deepcopy
 from pathlib import Path
-from typing import List, Tuple, Callable
+from typing import List, Tuple
 
 import numpy as np
 import scipy.sparse
 from PIL import Image
 from torch.utils.data import Dataset
 
-from dataset.transforms import DetRandomCrop, check_min_size, DetResize
+from dataset.transforms import DetTransform
 from utils.config import cfg
 
 
 # TODO: Perhaps change img_data into it's own class, maybe @dataclass in python3.7
 class IMDB(Dataset):
-    def __init__(self, name: str, img_set: str, classes: List[str], sort=True, transform: Callable = None, **kwargs):
+    def __init__(self, name: str, img_set: str, classes: List[str], sort=True, transform: DetTransform = None,
+                 **kwargs):
         """
         Base Image Database class
         :param name: name of the dataset

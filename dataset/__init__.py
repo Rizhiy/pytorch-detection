@@ -1,12 +1,11 @@
-from pathlib import Path
-from typing import List, Callable
+from typing import List
 
 from dataset.imdb import CombinedDataset, IMDB
-from utils.config import cfg
+from dataset.transforms import DetTransform
 from .pascal_voc import PASCAL_VOC
 
 
-def create_dataset(name: str, sets: List[str], transform: Callable = None, sort=True, flip=False,
+def create_dataset(name: str, sets: List[str], transform: DetTransform = None, sort=True, flip=False,
                    **kwargs) -> CombinedDataset:
     # TODO: Integrate flip
     datasets = []
