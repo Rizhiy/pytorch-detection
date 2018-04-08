@@ -12,11 +12,10 @@ TRAIN:
     - 1.0
     - 4.0
   SEED: 42
-  EPOCHS: 14
+  EPOCHS: 11
   STEPS:
     - 5
     - 8
-    - 11
   MAX_AREA: 650_000
   FLIP: False
   BG_THRESH_LO: 0.0

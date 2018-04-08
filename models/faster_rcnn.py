@@ -91,7 +91,6 @@ class FasterRCNN(nn.Module):
 
         box_pred = bbox_transform_inv(rois[:, :, 1:5].data, box_pred)
         box_pred = Variable(clip_boxes(box_pred, img_info, img_info.size(0)))
-        # TODO: Return actual boxes
 
         return cls_prob, box_pred, (cls_loss, box_loss, *rpn_losses)
 
