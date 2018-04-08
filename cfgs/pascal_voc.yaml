@@ -17,7 +17,6 @@ TRAIN:
     - 5
     - 8
   MAX_AREA: 650_000
-  FLIP: False
   BG_THRESH_LO: 0.0
 
 TEST:

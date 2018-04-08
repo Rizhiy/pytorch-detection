@@ -81,6 +81,8 @@ cfg.TRAIN.BATCH_IMAGES = 2
 cfg.TRAIN.RESIZE_SCALES = (.5, 2.)
 # Minimum relative size to crop
 cfg.TRAIN.CROP_MIN_SCALE = 0.5
+# If TRAIN.FLIP then images will be flipped with this probability
+cfg.TRAIN.FLIP_PROB = 0.5
 # Minibatch size (number of regions of interest [ROIs] to backprop) per image
 cfg.TRAIN.BATCH_SIZE = 128
 # Fraction of minibatch that is labeled foreground (i.e. class > 0)

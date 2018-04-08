@@ -1,7 +1,7 @@
 from typing import Tuple, List
 
 import numpy as np
-from PIL.Image import Image
+from PIL.Image import Image, FLIP_LEFT_RIGHT
 
 from utils import cfg
 
@@ -98,3 +98,15 @@ class DetCompose(DetTransform):
             format_string += f'    {t}'
         format_string += '\n)'
         return format_string
+
+
+class DetFlip(DetTransform):
+    def __init__(self, prob: float):
+        self.prob = prob
+
+    def __call__(self, img: Image, img_data: dict) -> Tuple[Image, dict]:
+        if np.random.uniform() < self.prob:
+            img = img.transpose(FLIP_LEFT_RIGHT)
+            img_data['boxes'][:, [2, 0]] = img_data['shape'][0] - img_data['boxes'][:, [0, 2]]
+            img_data['flipped'] = True
+        return img, img_data

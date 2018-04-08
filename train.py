@@ -1,8 +1,10 @@
 import argparse
+from datetime import datetime
 from pathlib import Path
 
-from torchvision.transforms import ToPILImage
 import torch
+from PIL import ImageDraw
+from tensorboardX import SummaryWriter
 from torch.autograd import Variable
 from torch.nn import DataParallel
 from torch.optim.lr_scheduler import MultiStepLR
@@ -10,21 +12,13 @@ from torch.utils.data import DataLoader
 
 from dataset import create_dataset
 from dataset.collate import resize_collate
-from dataset.transforms import DetCompose, DetRandomCrop, DetResize
+from dataset.transforms import DetCompose, DetRandomCrop, DetResize, DetFlip
 from models import create_feature_extractor
 from models.faster_rcnn import FasterRCNN
 from test import test
 from utils import tqdm, tensorToImage
 from utils.config import cfg, update_config
 from utils.serialisation import save_checkpoint, load_checkpoint, delete_detections
-
-from tensorboardX import SummaryWriter
-from datetime import datetime
-from PIL import Image, ImageDraw
-
-import numpy as np
-
-import time
 
 
 # TODO: Add logging
@@ -45,6 +39,8 @@ def train(batch_size: int = 1, workers: int = 4, resume: int = 0, validate=False
     writer = SummaryWriter(f"runs/{cfg.NAME} {datetime.now().strftime('%m-%d %H:%M')}")
 
     transforms = []
+    if cfg.TRAIN.FLIP:
+        transforms.append(DetFlip(cfg.TRAIN.FLIP_PROB))
     if cfg.TRAIN.CROP:
         transforms.append(DetRandomCrop(cfg.TRAIN.CROP_MIN_SCALE))
     if cfg.TRAIN.RESIZE:
@@ -52,9 +48,8 @@ def train(batch_size: int = 1, workers: int = 4, resume: int = 0, validate=False
 
     train_transform = DetCompose(transforms)
 
-    train_imdb = create_dataset(cfg.DATASET.NAME, cfg.DATASET.TRAIN_SETS,
-                                transform=train_transform, sort=cfg.DATASET.SORT, flip=cfg.TRAIN.FLIP,
-                                **cfg.DATASET.KWARGS)
+    train_imdb = create_dataset(cfg.DATASET.NAME, cfg.DATASET.TRAIN_SETS, transform=train_transform,
+                                sort=cfg.DATASET.SORT, **cfg.DATASET.KWARGS)
 
     num_gpus = torch.cuda.device_count()
     batch_size *= num_gpus

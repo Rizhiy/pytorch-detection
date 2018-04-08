@@ -1,5 +1,4 @@
 import pickle
-from copy import deepcopy
 from pathlib import Path
 from typing import List, Tuple
 
@@ -65,9 +64,6 @@ class IMDB(Dataset):
         img = Image.open(img_path)
         img_data = self._img_data[true_idx]
 
-        if img_data['flipped']:
-            img = img.transpose(Image.FLIP_LEFT_RIGHT)
-
         img_data['scale'] = 1.
         # create overlaps
         num_objs = len(img_data['classes'])
@@ -104,17 +100,9 @@ class IMDB(Dataset):
         they should have format of (x_min, y_min, x_max, y_max);
         'classes': np.ndarray with shape (m) where m is the number of objects;
         'shape': np.ndarray of shape (2) with contents being: (width, height);
-        'flipped': whether the image should be flipped around horizontal axis
+        'flipped': whether the image was flipped around horizontal axis
         """
         raise NotImplementedError
-
-    def create_flipped(self) -> 'IMDB':
-        new = deepcopy(self)
-        new.img_set += '_flipped'
-        for idx, data in enumerate(new._img_data):
-            data['boxes'][:, [2, 0]] = data['shape'][0] - data['boxes'][:, [0, 2]]
-            data['flipped'] = True
-        return new
 
     def evaluate(self, bbox_pred: List[np.array], cls_prob: List[np.array], debug=False, **kwargs) -> float:
         """
