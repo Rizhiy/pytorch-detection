@@ -1,10 +1,19 @@
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import List
 
 import numpy as np
 from PIL import Image
 
+from dataset.misc import ImgData
 from .imdb import IMDB
+
+
+class VocData(ImgData):
+    def __init__(self, path: Path, boxes: np.ndarray, classes: np.ndarray, shape: np.ndarray, num_classes: int,
+                 difficult: np.ndarray):
+        super().__init__(path, boxes, classes, shape, num_classes)
+        self.difficult = difficult
 
 
 class PASCAL_VOC(IMDB):
@@ -16,12 +25,8 @@ class PASCAL_VOC(IMDB):
         super().__init__("pascal_voc", img_set, self.obj_classes, **kwargs)
         self.year = year
 
-    def _create_img_index(self):
-        with (self._base_path / "ImageSets" / "Main" / (self.img_set + '.txt')).open('r') as img_list:
-            return [self._base_path / "JPEGImages" / (x.strip() + '.jpg') for x in img_list.readlines()]
-
-    def _create_img_data(self):
-        def load_pascal_annotation(path: Path):
+    def _create_img_data(self) -> List[VocData]:
+        def load_pascal_annotation(path: Path) -> VocData:
             # --------------------------------------------------------
             # Fast R-CNN
             # Copyright (c) 2015 Microsoft
@@ -32,7 +37,7 @@ class PASCAL_VOC(IMDB):
             objs = tree.findall('object')
             num_objs = len(objs)
 
-            boxes = np.zeros((num_objs, 4), dtype=np.uint16)
+            boxes = np.zeros((num_objs, 4), dtype=np.float)
             gt_classes = np.zeros((num_objs), dtype=np.int32)
             # "Seg" area for pascal is just the box area
             seg_areas = np.zeros((num_objs), dtype=np.float32)
@@ -57,18 +62,11 @@ class PASCAL_VOC(IMDB):
                 gt_classes[ix] = cls
                 seg_areas[ix] = (x2 - x1 + 1) * (y2 - y1 + 1)
 
-            return {'boxes': boxes,
-                    'classes': gt_classes,
-                    'flipped': False,
-                    'gt_ishard': ishards,
-                    'seg_areas': seg_areas}
+            img_path = self._base_path / "JPEGImages" / (path.stem + '.jpg')
+            shape = np.array(Image.open(img_path).size)
+            return VocData(img_path, boxes, gt_classes, shape, self.num_classes, ishards)
 
         with (self._base_path / "ImageSets" / "Main" / (self.img_set + '.txt')).open('r') as img_list:
             annotations_paths = [self._base_path / "Annotations" / (x.strip() + '.xml') for x in img_list.readlines()]
-        img_data = [load_pascal_annotation(path) for path in annotations_paths]
-        shapes = [np.array(Image.open(img_path).size) for img_path in self.img_index]
 
-        for data, shape in zip(img_data, shapes):
-            data.update({"shape": shape})
-
-        return img_data
+        return [load_pascal_annotation(path) for path in annotations_paths]

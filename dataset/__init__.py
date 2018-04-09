@@ -1,8 +1,8 @@
 from typing import List
 
-from dataset.imdb import CombinedDataset, IMDB
-from dataset.transforms import DetTransform
+from .imdb import CombinedDataset, IMDB
 from .pascal_voc import PASCAL_VOC
+from .transforms import DetTransform
 
 
 def create_dataset(name: str, sets: List[str], transform: DetTransform = None, sort=True,

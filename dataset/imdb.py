@@ -3,15 +3,17 @@ from pathlib import Path
 from typing import List, Tuple
 
 import numpy as np
-import scipy.sparse
 from PIL import Image
 from torch.utils.data import Dataset
 
+from dataset.misc import ImgData
 from dataset.transforms import DetTransform
 from utils.config import cfg
 
 
-# TODO: Perhaps change img_data into it's own class, maybe @dataclass in python3.7
+# Update to @dataclass in python3.7
+
+
 class IMDB(Dataset):
     def __init__(self, name: str, img_set: str, classes: List[str], sort=True, transform: DetTransform = None,
                  **kwargs):
@@ -26,33 +28,36 @@ class IMDB(Dataset):
         self.name = name
         self.img_set = img_set
         self.classes = ['__background__', *classes]
-        self.img_index = self._create_img_index()
         self.transform = transform
         self._cache_path = Path(cfg.DATASET.CACHE_FOLDER) / (self.name + '_' + self.img_set + '.pkl')
 
         if self._cache_path.exists():
             with self._cache_path.open('rb') as cache_file:
                 self._img_data = pickle.load(cache_file)
-            print(f"Loaded {self.name} cache from {self._cache_path}")
+            print(f"Loaded {self.full_name} cache from {self._cache_path}")
         else:
             self._cache_path.parent.mkdir(exist_ok=True)
             self._img_data = self._create_img_data()
             with self._cache_path.open('wb') as cache_file:
                 pickle.dump(self._img_data, cache_file)
-            print(f"Saved {self.name} cache to {self._cache_path}")
+            print(f"Saved {self.full_name} cache to {self._cache_path}")
         if sort:
             self._index_map = self._create_sorted_index()
         else:
-            self._index_map = range(len(self.img_index))
+            self._index_map = range(len(self._img_data))
 
     @property
     def num_classes(self) -> int:
         return len(self.classes)
 
-    def __len__(self):
-        return len(self.img_index)
+    @property
+    def full_name(self) -> str:
+        return f"{self.name}_{self.img_set}"
 
-    def __getitem__(self, idx) -> Tuple[Image.Image, dict]:
+    def __len__(self):
+        return len(self._img_data)
+
+    def __getitem__(self, idx) -> Tuple[Image.Image, ImgData]:
         """
         Return one image with corresponding data.
         Image should be PIL Image.
@@ -60,19 +65,10 @@ class IMDB(Dataset):
         Also to maintain maximum performance, images should be loaded in order (no shuffle)
         """
         true_idx = self._index_map[idx]
-        img_path = self.img_index[true_idx]
-        img = Image.open(img_path)
         img_data = self._img_data[true_idx]
+        img = Image.open(img_data.path)
 
-        img_data['scale'] = 1.
-        # create overlaps
-        num_objs = len(img_data['classes'])
-        overlaps = np.zeros((num_objs, self.num_classes), dtype=np.float32)
-        overlaps[np.arange(num_objs), img_data['classes']] = 1.
-        overlaps = scipy.sparse.csr_matrix(overlaps)
-        img_data['overlaps'] = overlaps
-
-        assert (img.size == img_data['shape']).all(), f"Image shape for {img_path} doesn't match stored shape"
+        assert (img.size == img_data.shape).all(), f"Image shape for {img_data.path} doesn't match stored shape"
 
         if self.transform is not None:
             img, img_data = self.transform(img, img_data)
@@ -81,19 +77,13 @@ class IMDB(Dataset):
 
     def _create_sorted_index(self):
         # shuffle img_index first, since sort is stable in python
-        combined = list(zip(self.img_index, self._img_data))
-        np.random.shuffle(combined)
-        self.img_index[:], self._img_data[:] = zip(*combined)
+        np.random.shuffle(self._img_data)
 
-        img_map = list(enumerate([data['shape'] for data in self._img_data]))
+        img_map = list(enumerate([data.shape for data in self._img_data]))
         img_map.sort(key=lambda x: x[1][0] / x[1][1])
         return [img_idx for img_idx, img_shape in img_map]
 
-    def _create_img_index(self) -> List[Path]:
-        "Should return a list of paths to each image in the dataset"
-        raise NotImplementedError
-
-    def _create_img_data(self) -> List[dict]:
+    def _create_img_data(self) -> List[ImgData]:
         """
         Should return a list of dicts with each dict having the following items:
         'boxes': np.ndarray with shape (m,4) where m is the number of objects,
@@ -132,7 +122,7 @@ class IMDB(Dataset):
         npos = 0
         for true_idx in self._index_map:
             img_data = self._img_data[true_idx]
-            img_boxes = [x[1] for x in zip(img_data['classes'], img_data['boxes']) if x[0] == cls]
+            img_boxes = [x[1] for x in zip(img_data.classes, img_data.boxes) if x[0] == cls]
             gt_boxes.append({'boxes': np.array(img_boxes),
                              'detected': [False] * len(img_boxes)})
             npos += len(img_boxes)
@@ -247,16 +237,9 @@ class CombinedDataset(IMDB):
         dclasses = [x.classes for x in datasets]
         assert dclasses.count(dclasses[0]) == len(dclasses), "Datasets have different classes!"
 
-    def _create_img_data(self):
+    def _create_img_data(self) -> List[ImgData]:
         img_data = []
         for dataset in self.datasets:
             for idx in dataset._index_map:
                 img_data.append(dataset._img_data[idx])
         return img_data
-
-    def _create_img_index(self):
-        img_idxs = []
-        for dataset in self.datasets:
-            for idx in dataset._index_map:
-                img_idxs.append(dataset.img_index[idx])
-        return img_idxs

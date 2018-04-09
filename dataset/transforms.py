@@ -3,11 +3,12 @@ from typing import Tuple, List
 import numpy as np
 from PIL.Image import Image, FLIP_LEFT_RIGHT
 
+from dataset.misc import ImgData
 from utils import cfg
 
 
 class DetTransform:
-    def __call__(self, img: Image, img_data: dict) -> Tuple[Image, dict]:
+    def __call__(self, img: Image, img_data: ImgData) -> Tuple[Image, ImgData]:
         raise NotImplementedError
 
 
@@ -29,8 +30,8 @@ class DetRandomCrop(DetTransform):
     def __init__(self, min_scale: float):
         self.min_scale = min_scale
 
-    def __call__(self, orig_img: Image, img_data: dict) -> Tuple[Image, dict]:
-        orig_shape = img_data['shape']
+    def __call__(self, orig_img: Image, img_data: ImgData) -> Tuple[Image, ImgData]:
+        orig_shape = img_data.shape
         crop_scale = np.random.uniform(low=self.min_scale)
 
         w, h = orig_shape
@@ -39,21 +40,20 @@ class DetRandomCrop(DetTransform):
         y = np.random.randint(0, h - th)
 
         new_img = orig_img.crop((x, y, x + tw, y + th))
-        new_shape = np.array((tw, th))
+        img_data.shape = np.array((tw, th))
         # TODO: Perhaps delete boxes that are too small
-        new_boxes = np.clip(img_data['boxes'] - [x, y, x, y], 0, [tw, th, tw, th])
-        img_data.update({'shape': new_shape,
-                         'boxes': new_boxes})
+        img_data.boxes = np.clip(img_data.boxes - [x, y, x, y], 0, [tw, th, tw, th])
 
         return new_img, img_data
 
 
-def resize(img: Image, img_data: dict, scale: np.ndarray) -> Tuple[Image, dict]:
-    target_shape = tuple((img_data['shape'] * scale).astype(int))
+def resize(img: Image, img_data: ImgData, scale: np.ndarray) -> Tuple[Image, ImgData]:
+    target_shape = tuple((img_data.shape * scale).astype(int))
 
     img = img.resize(target_shape)
-    img_data.update({'shape': target_shape,
-                     'boxes': img_data['boxes'] * scale})
+    img_data.shape = target_shape
+    img_data.boxes *= scale
+
     return img, img_data
 
 
@@ -69,8 +69,8 @@ class DetResize(DetTransform):
         self.low = low
         self.high = high
 
-    def __call__(self, orig_img: Image, img_data: dict) -> Tuple[Image, dict]:
-        shape = img_data['shape']
+    def __call__(self, orig_img: Image, img_data: ImgData) -> Tuple[Image, ImgData]:
+        shape = img_data.shape
         if self.high is None:
             scale = self.low
         else:
@@ -86,7 +86,7 @@ class DetCompose(DetTransform):
     def __init__(self, transforms: List[DetTransform]):
         self.transforms = transforms
 
-    def __call__(self, img: Image, img_data: dict) -> Tuple[Image, dict]:
+    def __call__(self, img: Image, img_data: ImgData) -> Tuple[Image, ImgData]:
         for t in self.transforms:
             img, img_data = t(img, img_data)
         return img, img_data
@@ -104,9 +104,9 @@ class DetFlip(DetTransform):
     def __init__(self, prob: float):
         self.prob = prob
 
-    def __call__(self, img: Image, img_data: dict) -> Tuple[Image, dict]:
+    def __call__(self, img: Image, img_data: ImgData) -> Tuple[Image, ImgData]:
         if np.random.uniform() < self.prob:
             img = img.transpose(FLIP_LEFT_RIGHT)
-            img_data['boxes'][:, [2, 0]] = img_data['shape'][0] - img_data['boxes'][:, [0, 2]]
-            img_data['flipped'] = True
+            img_data.boxes[:, [2, 0]] = img_data.shape[0] - img_data.boxes[:, [0, 2]]
+            img_data.flipped = True
         return img, img_data
