@@ -1,12 +1,12 @@
 import sys
 from typing import List
 
+import numpy as np
 import torch
-from PIL import Image
+from PIL import Image, ImageDraw
 from tqdm import tqdm as original_tqdm
 
 from utils.config import cfg
-import numpy as np
 
 
 def tqdm(desc: str, total: int):
@@ -14,7 +14,7 @@ def tqdm(desc: str, total: int):
                          smoothing=0.1)
 
 
-def tensorToImage(imgs: torch.FloatTensor) -> List[Image.Image]:
+def tensorToImages(imgs: torch.FloatTensor) -> List[Image.Image]:
     """
     Reverses normalisation of tensors and converts them back to PIL Images
     :param imgs: Batch of images must be in BCHW format
@@ -28,3 +28,13 @@ def tensorToImage(imgs: torch.FloatTensor) -> List[Image.Image]:
         img = Image.fromarray((img * 256).astype(np.uint8))
         result.append(img)
     return result
+
+
+def drawBoxes(img: Image, boxes: np.ndarray, thresh=0.5):
+    draw = ImageDraw.Draw(img)
+    for box in boxes:
+        if box[-1] < thresh:
+            continue
+        box = box.astype(int)
+        draw.rectangle(tuple(box[:4]), outline=(0, 255, 0))
+    return img
