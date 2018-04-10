@@ -1,5 +1,6 @@
 from .feature_extractors import resnet
 
 
-def create_feature_extractor(type: str, pretrained=True, **kwargs):
-    return eval(type)(pretrained=pretrained, **kwargs)
+# TODO: Perhaps rename 'feature extractor' to 'backbone'
+def create_feature_extractor(cls: str, pretrained=True, **kwargs):
+    return eval(cls)(pretrained=pretrained, **kwargs)

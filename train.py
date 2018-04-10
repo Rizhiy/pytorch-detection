@@ -3,7 +3,6 @@ from datetime import datetime
 from pathlib import Path
 
 import torch
-from PIL import ImageDraw
 from tensorboardX import SummaryWriter
 from torch.autograd import Variable
 from torch.nn import DataParallel
@@ -16,7 +15,7 @@ from dataset.transforms import DetCompose, DetRandomCrop, DetResize, DetFlip
 from models import create_feature_extractor
 from models.faster_rcnn import FasterRCNN
 from test import test
-from utils import tqdm, tensorToImage
+from utils import tqdm
 from utils.config import cfg, update_config
 from utils.serialisation import save_checkpoint, load_checkpoint, delete_detections
 
@@ -56,7 +55,7 @@ def train(batch_size: int = 1, workers: int = 4, resume: int = 0, validate=False
     train_loader = DataLoader(train_imdb, batch_size=batch_size, shuffle=False,
                               num_workers=workers, pin_memory=True, collate_fn=resize_collate(cfg.TRAIN.MAX_AREA))
 
-    feature_extractor = create_feature_extractor(cfg.NETWORK.FEATURE_EXTRACTOR.TYPE,
+    feature_extractor = create_feature_extractor(cfg.NETWORK.FEATURE_EXTRACTOR.CLASS,
                                                  pretrained=cfg.NETWORK.FEATURE_EXTRACTOR.PRETRAINED,
                                                  depth=cfg.NETWORK.FEATURE_EXTRACTOR.DEPTH)
     net = FasterRCNN(feature_extractor, train_imdb.num_classes)
@@ -96,16 +95,6 @@ def train(batch_size: int = 1, workers: int = 4, resume: int = 0, validate=False
                 input_imgs = Variable(imgs)
                 input_info = Variable(img_info)
                 input_boxes = Variable(boxes)
-
-                for img_idx, img in enumerate(tensorToImage(input_imgs.data)):
-                    draw = ImageDraw.Draw(img)
-                    boxes = input_boxes[img_idx].data.cpu().numpy()
-                    for box in boxes:
-                        box = box.astype(int)
-                        draw.rectangle(tuple(box[:4]), outline=(0, 255, 0))
-                    img.save(f"{batch_size*idx+img_idx}.jpg")
-                if idx > 3:
-                    exit()
 
                 if cfg.CUDA:
                     input_imgs, input_info, input_boxes = input_imgs.cuda(), input_info.cuda(), input_boxes.cuda()

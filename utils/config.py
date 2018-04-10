@@ -18,11 +18,11 @@ cfg.OUTPUT = 'output'
 cfg.NETWORK = edict()
 cfg.NETWORK.PIXEL_MEANS = (0.485, 0.456, 0.406)
 cfg.NETWORK.PIXEL_STDS = (0.229, 0.224, 0.225)
-# Parameters for feature extractor, not every feature extractor uses all of the parameters
 cfg.NETWORK.FEATURE_EXTRACTOR = edict()
-cfg.NETWORK.FEATURE_EXTRACTOR.TYPE = 'resnet'
-cfg.NETWORK.FEATURE_EXTRACTOR.DEPTH = 50
+cfg.NETWORK.FEATURE_EXTRACTOR.CLASS = 'resnet'
 cfg.NETWORK.FEATURE_EXTRACTOR.PRETRAINED = True
+cfg.NETWORK.FEATURE_EXTRACTOR.KWARGS = edict()
+cfg.NETWORK.FEATURE_EXTRACTOR.KWARGS.depth = 50
 
 # RPN settings
 cfg.NETWORK.RPN = edict()
@@ -35,7 +35,7 @@ cfg.NETWORK.RPN.FILTERS = 512
 cfg.NETWORK.MIN_SIZE = cfg.NETWORK.RPN.ANCHOR_SCALES[0] * (16 + 1)
 # RoIPooling
 cfg.NETWORK.POOLING_SIZE = 7
-# Whether bbox prediction is class agnostic
+# Whether head bbox prediction is class agnostic
 cfg.NETWORK.CLASS_AGNOSTIC = True
 # Normalize the targets using "precomputed" (or made up) means and stdevs
 cfg.NETWORK.TARGETS_NORMALISE = edict()
@@ -95,7 +95,7 @@ cfg.TRAIN.BG_THRESH_HI = 0.5
 cfg.TRAIN.BG_THRESH_LO = 0.0
 
 cfg.TRAIN.RPN = edict()
-# NMS
+# RPN NMS
 cfg.TRAIN.RPN.NMS = edict()
 cfg.TRAIN.RPN.NMS.PRE_TOP_N = 12000
 cfg.TRAIN.RPN.NMS.THRESH = 0.7
@@ -125,11 +125,16 @@ cfg.TEST.MAX_AREA = 1_200_000  # Can be about double of TEST.MAX_AREA, since we 
 # TODO: Add default input size option to allow testing similar to competitions
 
 cfg.TEST.RPN = edict()
-# NMS
+# RPN NMS
 cfg.TEST.RPN.NMS = edict()
-cfg.TEST.RPN.NMS.PRE_TOP_N = 12000
+cfg.TEST.RPN.NMS.PRE_TOP_N = 6000
 cfg.TEST.RPN.NMS.THRESH = 0.7
-cfg.TEST.RPN.NMS.POST_TOP_N = 2000
+cfg.TEST.RPN.NMS.POST_TOP_N = 300
+
+cfg.TEST.THRESH = 0.01
+
+# TODO: Perhaps make this NETWORK parameter
+cfg.TEST.NMS_THRESH = 0.5
 
 np.random.seed(cfg.TRAIN.SEED)
 

@@ -3,7 +3,7 @@ from torchvision.models.resnet import *
 
 
 class FeatureExtractor(nn.Module):
-    def __init__(self, pretrained=True):
+    def __init__(self, pretrained=True, **kwargs):
         super().__init__()
         self.pretrained = pretrained
 
@@ -39,8 +39,8 @@ class resnet(FeatureExtractor):
                 101: resnet101,
                 152: resnet152}
 
-    def __init__(self, depth: int, pretrained=True):
-        super().__init__(pretrained)
+    def __init__(self, depth: int, pretrained=True, **kwargs):
+        super().__init__(pretrained, **kwargs)
         if depth not in self._factory:
             raise ValueError(f"Unsupported depth for resnet: {depth}. Options: {list(self._factory.keys())}")
         self.resnet = self._factory[depth](pretrained)
